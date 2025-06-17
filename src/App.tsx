@@ -9,6 +9,7 @@ import { QualityHistogram } from './components/QualityHistogram';
 import { ReportExport } from './components/ReportExport';
 import { ImageAnalysis, ProcessingProgress, AnalysisStats } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
+import { calculateQualityStatistics } from './utils/qualityAssessment';
 
 function App() {
   const [analyses, setAnalyses] = useState<ImageAnalysis[]>([]);
@@ -17,51 +18,41 @@ function App() {
     total: 0,
     isProcessing: false
   });
-  const [threshold, setThreshold] = useState(70); // Updated default threshold for composite scoring
+  const [threshold, setThreshold] = useState(70); // Default threshold for composite scoring
 
+  /**
+   * Calculates comprehensive statistics for all analyzed images
+   */
   const calculateStats = useCallback((analyses: ImageAnalysis[]): AnalysisStats => {
-    const excellentCount = analyses.filter(a => a.compositeScore?.recommendation === 'excellent').length;
-    const goodCount = analyses.filter(a => a.compositeScore?.recommendation === 'good').length;
-    const acceptableCount = analyses.filter(a => a.compositeScore?.recommendation === 'acceptable').length;
-    const poorCount = analyses.filter(a => a.compositeScore?.recommendation === 'poor').length;
-    const unsuitableCount = analyses.filter(a => a.compositeScore?.recommendation === 'unsuitable').length;
+    const baseStats = calculateQualityStatistics(analyses, threshold);
+    
+    // Calculate additional metrics for the stats overview
+    const averageExposureScore = analyses.length > 0
+      ? analyses.reduce((sum, a) => sum + (a.exposureAnalysis?.exposureScore || 0), 0) / analyses.length
+      : 0;
+    
+    const averageNoiseScore = analyses.length > 0
+      ? analyses.reduce((sum, a) => sum + (a.noiseAnalysis?.noiseScore || 0), 0) / analyses.length
+      : 0;
 
     return {
-      totalImages: analyses.length,
-      excellentCount,
-      goodCount,
-      poorCount,
-      unsuitableCount,
-      averageBlurScore: analyses.length > 0 
-        ? analyses.reduce((sum, a) => sum + a.blurScore, 0) / analyses.length 
-        : 0,
-      averageExposureScore: analyses.length > 0
-        ? analyses.reduce((sum, a) => sum + (a.exposureAnalysis?.exposureScore || 0), 0) / analyses.length
-        : 0,
-      averageNoiseScore: analyses.length > 0
-        ? analyses.reduce((sum, a) => sum + (a.noiseAnalysis?.noiseScore || 0), 0) / analyses.length
-        : 0,
-      averageCompositeScore: analyses.length > 0
-        ? analyses.reduce((sum, a) => sum + (a.compositeScore?.overall || 0), 0) / analyses.length
-        : 0,
-      averageDescriptorScore: analyses.length > 0
-        ? analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.photogrammetricScore || 0), 0) / analyses.length
-        : 0,
-      averageKeypointCount: analyses.length > 0
-        ? analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.keypointCount || 0), 0) / analyses.length
-        : 0,
-      recommendedForReconstruction: analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold).length,
-      cameraStats: {},
+      ...baseStats,
+      averageExposureScore,
+      averageNoiseScore,
+      cameraStats: {}, // TODO: Implement camera statistics aggregation
       qualityDistribution: {
-        excellent: excellentCount,
-        good: goodCount,
-        acceptable: acceptableCount,
-        poor: poorCount,
-        unsuitable: unsuitableCount
+        excellent: baseStats.excellentCount,
+        good: baseStats.goodCount,
+        acceptable: baseStats.acceptableCount,
+        poor: baseStats.poorCount,
+        unsuitable: baseStats.unsuitableCount
       }
     };
   }, [threshold]);
 
+  /**
+   * Handles file selection and processes images sequentially
+   */
   const handleFilesSelected = useCallback(async (files: File[]) => {
     setProgress({
       current: 0,
@@ -78,6 +69,7 @@ function App() {
         const analysis = await analyzeImage(file);
         newAnalyses.push(analysis);
       } catch (error) {
+        // Create error analysis if processing fails
         newAnalyses.push({
           id: Math.random().toString(36).substr(2, 9),
           file,
@@ -91,6 +83,7 @@ function App() {
         });
       }
 
+      // Update progress
       setProgress(prev => ({
         ...prev,
         current: i + 1
@@ -100,6 +93,7 @@ function App() {
       setAnalyses(prev => [...prev, ...newAnalyses.slice(i, i + 1)]);
     }
 
+    // Mark processing as complete
     setProgress(prev => ({
       ...prev,
       isProcessing: false

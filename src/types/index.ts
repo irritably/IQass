@@ -1,3 +1,10 @@
+/**
+ * Type Definitions for Drone Image Quality Analyzer
+ * 
+ * This module contains all TypeScript interfaces and types used throughout
+ * the application for image analysis, quality assessment, and UI components.
+ */
+
 export interface ImageAnalysis {
   id: string;
   file: File;
@@ -13,7 +20,7 @@ export interface ImageAnalysis {
   noiseAnalysis?: NoiseAnalysis;
   metadata?: CameraMetadata;
   compositeScore?: CompositeQualityScore;
-  // New descriptor-based analysis
+  // Descriptor-based analysis for photogrammetric quality
   descriptorAnalysis?: DescriptorAnalysis;
 }
 
@@ -119,11 +126,11 @@ export interface CameraMetadata {
 }
 
 export interface CompositeQualityScore {
-  blur: number;          // 30% weight (reduced)
+  blur: number;          // 30% weight
   exposure: number;      // 25% weight
   noise: number;         // 20% weight
-  technical: number;     // 10% weight (reduced)
-  descriptor: number;    // 15% weight (new)
+  technical: number;     // 10% weight
+  descriptor: number;    // 15% weight
   overall: number;       // Weighted average
   recommendation: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
 }

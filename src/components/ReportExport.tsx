@@ -1,7 +1,7 @@
 import React from 'react';
 import { ImageAnalysis } from '../types';
 import { Download, FileText, Package } from 'lucide-react';
-import { exportToCSV, generateReport } from '../utils/imageAnalysis';
+import { exportQualityDataToCSV, generateQualityReport } from '../utils/qualityAssessment';
 
 interface ReportExportProps {
   analyses: ImageAnalysis[];
@@ -9,43 +9,19 @@ interface ReportExportProps {
 }
 
 export const ReportExport: React.FC<ReportExportProps> = ({ analyses, threshold }) => {
+  /**
+   * Handles CSV export of analysis data
+   */
   const handleExportCSV = () => {
-    exportToCSV(analyses, threshold);
+    exportQualityDataToCSV(analyses, threshold);
   };
 
+  /**
+   * Handles full report export as text file
+   */
   const handleExportReport = () => {
-    const report = generateReport(analyses, threshold);
-    const reportContent = `
-DRONE IMAGE QUALITY ANALYSIS REPORT
-Generated: ${new Date().toLocaleString()}
-Threshold: ${threshold}
-
-SUMMARY STATISTICS
-==================
-Total Images: ${report.stats.totalImages}
-Average Blur Score: ${report.stats.averageBlurScore.toFixed(2)}
-Recommended for Reconstruction: ${report.stats.recommendedForReconstruction} (${((report.stats.recommendedForReconstruction / report.stats.totalImages) * 100).toFixed(1)}%)
-
-QUALITY DISTRIBUTION
-===================
-Excellent (80-100): ${report.stats.excellentCount}
-Good (60-79): ${report.stats.goodCount}
-Poor (40-59): ${report.stats.poorCount}
-Unsuitable (0-39): ${report.stats.unsuitableCount}
-
-DETAILED RESULTS
-===============
-${report.recommendations.map(r => 
-  `${r.filename}: Score ${r.blurScore} (${r.quality}) - ${r.recommended ? 'RECOMMENDED' : 'NOT RECOMMENDED'}`
-).join('\n')}
-
-RECOMMENDATIONS
-==============
-- Use images with blur scores ≥ ${threshold} for photogrammetry reconstruction
-- Consider retaking images with scores below ${threshold}
-- For high-precision work, consider using only images with scores ≥ 60
-- Review images flagged as "poor" or "unsuitable" for potential issues
-    `;
+    const report = generateQualityReport(analyses, threshold);
+    const reportContent = generateReportText(report, threshold);
 
     const blob = new Blob([reportContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -94,4 +70,49 @@ RECOMMENDATIONS
       </div>
     </div>
   );
+};
+
+/**
+ * Generates formatted text report content
+ * @param report - Quality report data
+ * @param threshold - Quality threshold used
+ * @returns Formatted report text
+ */
+const generateReportText = (report: any, threshold: number): string => {
+  return `
+DRONE IMAGE QUALITY ANALYSIS REPORT
+Generated: ${new Date().toLocaleString()}
+Threshold: ${threshold}
+
+SUMMARY STATISTICS
+==================
+Total Images: ${report.stats.totalImages}
+Average Blur Score: ${report.stats.averageBlurScore.toFixed(2)}
+Average Composite Score: ${report.stats.averageCompositeScore.toFixed(2)}
+Average Descriptor Score: ${report.stats.averageDescriptorScore.toFixed(2)}
+Average Keypoint Count: ${Math.round(report.stats.averageKeypointCount)}
+Recommended for Reconstruction: ${report.stats.recommendedForReconstruction} (${((report.stats.recommendedForReconstruction / report.stats.totalImages) * 100).toFixed(1)}%)
+
+QUALITY DISTRIBUTION
+===================
+Excellent (85-100): ${report.stats.excellentCount}
+Good (70-84): ${report.stats.goodCount}
+Acceptable (55-69): ${report.stats.acceptableCount}
+Poor (40-54): ${report.stats.poorCount}
+Unsuitable (0-39): ${report.stats.unsuitableCount}
+
+DETAILED RESULTS
+===============
+${report.recommendations.map((r: any) => 
+  `${r.filename}: Composite ${r.compositeScore} | Blur ${r.blurScore} | Descriptor ${r.descriptorScore} | Keypoints ${r.keypointCount} (${r.quality}) - ${r.recommended ? 'RECOMMENDED' : 'NOT RECOMMENDED'}`
+).join('\n')}
+
+RECOMMENDATIONS
+==============
+- Use images with composite scores ≥ ${threshold} for photogrammetry reconstruction
+- Consider retaking images with scores below ${threshold}
+- For high-precision work, consider using only images with scores ≥ 70
+- Review images flagged as "poor" or "unsuitable" for potential issues
+- Pay attention to descriptor scores and keypoint counts for feature matching quality
+    `;
 };
