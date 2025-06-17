@@ -82,8 +82,8 @@ const extractKeypoints = (data: Uint8ClampedArray, width: number, height: number
   const blobKeypoints = blobDetection(grayscale, width, height);
   keypoints.push(...blobKeypoints);
   
-  // Remove duplicates and sort by strength (OPTIMIZED)
-  const uniqueKeypoints = removeDuplicateKeypointsOptimized(keypoints, width, height);
+  // Remove duplicates and sort by strength
+  const uniqueKeypoints = removeDuplicateKeypoints(keypoints);
   return uniqueKeypoints.sort((a, b) => b.strength - a.strength).slice(0, 2000); // Limit to top 2000
 };
 
@@ -257,77 +257,26 @@ const blobDetection = (grayscale: Float32Array, width: number, height: number): 
   return keypoints;
 };
 
-// OPTIMIZED: Spatial hashing approach for O(N) duplicate removal
-const removeDuplicateKeypointsOptimized = (keypoints: Keypoint[], width: number, height: number): Keypoint[] => {
-  if (keypoints.length === 0) return [];
-  
-  const minDistance = 5;
-  const gridSize = Math.ceil(minDistance);
-  const gridWidth = Math.ceil(width / gridSize);
-  const gridHeight = Math.ceil(height / gridSize);
-  
-  // Create spatial hash grid
-  const grid: Keypoint[][][] = Array(gridHeight).fill(null).map(() => 
-    Array(gridWidth).fill(null).map(() => [])
-  );
-  
-  // Place keypoints in grid
-  for (const kp of keypoints) {
-    const gridX = Math.floor(kp.x / gridSize);
-    const gridY = Math.floor(kp.y / gridSize);
-    
-    if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
-      grid[gridY][gridX].push(kp);
-    }
-  }
-  
+const removeDuplicateKeypoints = (keypoints: Keypoint[]): Keypoint[] => {
   const unique: Keypoint[] = [];
-  const processed = new Set<string>();
+  const minDistance = 5;
   
-  // Process each grid cell
-  for (let gy = 0; gy < gridHeight; gy++) {
-    for (let gx = 0; gx < gridWidth; gx++) {
-      const cellKeypoints = grid[gy][gx];
-      
-      for (const kp of cellKeypoints) {
-        const key = `${Math.round(kp.x)},${Math.round(kp.y)}`;
-        if (processed.has(key)) continue;
-        
-        let bestKeypoint = kp;
-        processed.add(key);
-        
-        // Check neighboring cells for duplicates
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const neighborY = gy + dy;
-            const neighborX = gx + dx;
-            
-            if (neighborY >= 0 && neighborY < gridHeight && 
-                neighborX >= 0 && neighborX < gridWidth) {
-              
-              const neighborKeypoints = grid[neighborY][neighborX];
-              
-              for (const neighbor of neighborKeypoints) {
-                const neighborKey = `${Math.round(neighbor.x)},${Math.round(neighbor.y)}`;
-                if (processed.has(neighborKey)) continue;
-                
-                const dist = Math.sqrt(
-                  (kp.x - neighbor.x) ** 2 + (kp.y - neighbor.y) ** 2
-                );
-                
-                if (dist < minDistance) {
-                  processed.add(neighborKey);
-                  if (neighbor.strength > bestKeypoint.strength) {
-                    bestKeypoint = neighbor;
-                  }
-                }
-              }
-            }
-          }
+  for (const kp of keypoints) {
+    let isDuplicate = false;
+    for (const existing of unique) {
+      const dist = Math.sqrt((kp.x - existing.x) ** 2 + (kp.y - existing.y) ** 2);
+      if (dist < minDistance) {
+        isDuplicate = true;
+        if (kp.strength > existing.strength) {
+          // Replace with stronger keypoint
+          const index = unique.indexOf(existing);
+          unique[index] = kp;
         }
-        
-        unique.push(bestKeypoint);
+        break;
       }
+    }
+    if (!isDuplicate) {
+      unique.push(kp);
     }
   }
   

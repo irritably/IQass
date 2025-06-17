@@ -7,17 +7,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  worker: {
-    format: 'es'
-  },
-  build: {
-    target: 'es2020',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'analysis-worker': ['./src/workers/analysisWorker.ts']
-        }
-      }
-    }
-  }
 });

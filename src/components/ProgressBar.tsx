@@ -3,10 +3,9 @@ import { ProcessingProgress } from '../types';
 
 interface ProgressBarProps {
   progress: ProcessingProgress;
-  currentStage?: string;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, currentStage }) => {
+export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   if (!progress.isProcessing) return null;
 
   const percentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
@@ -20,27 +19,16 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress, currentStage
         </span>
       </div>
       
-      <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+      <div className="w-full bg-gray-200 rounded-full h-3">
         <div
           className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
           style={{ width: `${percentage}%` }}
         />
       </div>
       
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-gray-600">
-          {currentStage || 'Analyzing image quality using advanced computer vision algorithms...'}
-        </span>
-        <span className="font-medium text-blue-600">
-          {Math.round(percentage)}%
-        </span>
-      </div>
-      
-      {progress.current > 0 && (
-        <div className="mt-2 text-xs text-gray-500">
-          Using Web Workers for optimal performance
-        </div>
-      )}
+      <p className="text-sm text-gray-600 mt-2">
+        Analyzing blur metrics using Laplacian variance detection...
+      </p>
     </div>
   );
 };

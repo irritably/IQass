@@ -5,24 +5,18 @@ import { extractMetadata, calculateTechnicalScore } from './metadataExtraction';
 import { calculateCompositeScore } from './compositeScoring';
 import { analyzeDescriptors } from './descriptorAnalysis';
 
-// Optimized blur detection with reduced memory allocation
 export const calculateBlurScore = (imageData: ImageData): number => {
   const { data, width, height } = imageData;
   
-  // Pre-allocate arrays to reduce garbage collection
-  const grayscaleSize = width * height;
-  const grayscale = new Float32Array(grayscaleSize);
-  
-  // Convert to grayscale using optimized loop
-  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    grayscale[j] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  // Convert to grayscale and calculate Laplacian variance
+  const grayscale: number[] = [];
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    grayscale.push(gray);
   }
   
-  // Apply Laplacian kernel with boundary checking
-  let sum = 0;
-  let sumSquares = 0;
-  let count = 0;
-  
+  // Apply Laplacian kernel
+  const laplacian: number[] = [];
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       const idx = y * width + x;
@@ -30,17 +24,13 @@ export const calculateBlurScore = (imageData: ImageData): number => {
         -1 * grayscale[idx - width - 1] + -1 * grayscale[idx - width] + -1 * grayscale[idx - width + 1] +
         -1 * grayscale[idx - 1] + 8 * grayscale[idx] + -1 * grayscale[idx + 1] +
         -1 * grayscale[idx + width - 1] + -1 * grayscale[idx + width] + -1 * grayscale[idx + width + 1];
-      
-      const absValue = Math.abs(value);
-      sum += absValue;
-      sumSquares += absValue * absValue;
-      count++;
+      laplacian.push(Math.abs(value));
     }
   }
   
-  // Calculate variance more efficiently
-  const mean = sum / count;
-  const variance = (sumSquares / count) - (mean * mean);
+  // Calculate variance
+  const mean = laplacian.reduce((sum, val) => sum + val, 0) / laplacian.length;
+  const variance = laplacian.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / laplacian.length;
   
   // Normalize to 0-100 scale (empirically determined scaling)
   const normalizedScore = Math.min(100, Math.max(0, Math.log(variance + 1) * 15));
@@ -55,71 +45,31 @@ export const getQualityLevel = (compositeScore: number): ImageAnalysis['quality'
   return 'unsuitable';
 };
 
-// Optimized thumbnail creation with better memory management
 export const createThumbnail = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', {
-      alpha: false,
-      desynchronized: true,
-      willReadFrequently: false
-    });
-    
-    if (!ctx) {
-      reject(new Error('Failed to get canvas context'));
-      return;
-    }
-    
+    const ctx = canvas.getContext('2d');
     const img = new Image();
     
     img.onload = () => {
-      try {
-        const maxSize = 150;
-        const ratio = Math.min(maxSize / img.width, maxSize / img.height);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        
-        // Use high-quality scaling
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
-        
-        // Clean up
-        URL.revokeObjectURL(img.src);
-        
-        resolve(thumbnail);
-      } catch (error) {
-        URL.revokeObjectURL(img.src);
-        reject(error);
-      }
+      const maxSize = 150;
+      const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+      canvas.width = img.width * ratio;
+      canvas.height = img.height * ratio;
+      
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
     
-    img.onerror = () => {
-      URL.revokeObjectURL(img.src);
-      reject(new Error('Failed to load image for thumbnail'));
-    };
-    
+    img.onerror = reject;
     img.src = URL.createObjectURL(file);
   });
 };
 
-// Fallback analysis function for when workers are not available
-export const analyzeImageFallback = async (file: File): Promise<ImageAnalysis> => {
+export const analyzeImage = async (file: File): Promise<ImageAnalysis> => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', {
-      alpha: false,
-      desynchronized: true,
-      willReadFrequently: true
-    });
-    
-    if (!ctx) {
-      resolve(createErrorAnalysis(file, 'Failed to get canvas context'));
-      return;
-    }
-    
+    const ctx = canvas.getContext('2d');
     const img = new Image();
     
     img.onload = async () => {
@@ -130,12 +80,12 @@ export const analyzeImageFallback = async (file: File): Promise<ImageAnalysis> =
         canvas.width = img.width * ratio;
         canvas.height = img.height * ratio;
         
-        // Use optimized canvas settings
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
         
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (!imageData) {
+          throw new Error('Failed to get image data');
+        }
         
         // Perform all analyses
         const blurScore = calculateBlurScore(imageData);
@@ -157,9 +107,6 @@ export const analyzeImageFallback = async (file: File): Promise<ImageAnalysis> =
         const quality = getQualityLevel(compositeScore.overall);
         const thumbnail = await createThumbnail(file);
         
-        // Clean up
-        URL.revokeObjectURL(img.src);
-        
         resolve({
           id: Math.random().toString(36).substr(2, 9),
           file,
@@ -176,31 +123,37 @@ export const analyzeImageFallback = async (file: File): Promise<ImageAnalysis> =
           compositeScore
         });
       } catch (error) {
-        URL.revokeObjectURL(img.src);
-        resolve(createErrorAnalysis(file, error instanceof Error ? error.message : 'Analysis failed'));
+        resolve({
+          id: Math.random().toString(36).substr(2, 9),
+          file,
+          name: file.name,
+          size: file.size,
+          blurScore: 0,
+          quality: 'unsuitable',
+          thumbnail: '',
+          processed: true,
+          error: error instanceof Error ? error.message : 'Analysis failed'
+        });
       }
     };
     
     img.onerror = () => {
-      URL.revokeObjectURL(img.src);
-      resolve(createErrorAnalysis(file, 'Failed to load image'));
+      resolve({
+        id: Math.random().toString(36).substr(2, 9),
+        file,
+        name: file.name,
+        size: file.size,
+        blurScore: 0,
+        quality: 'unsuitable',
+        thumbnail: '',
+        processed: true,
+        error: 'Failed to load image'
+      });
     };
     
     img.src = URL.createObjectURL(file);
   });
 };
-
-const createErrorAnalysis = (file: File, error: string): ImageAnalysis => ({
-  id: Math.random().toString(36).substr(2, 9),
-  file,
-  name: file.name,
-  size: file.size,
-  blurScore: 0,
-  quality: 'unsuitable',
-  thumbnail: '',
-  processed: true,
-  error
-});
 
 export const generateReport = (analyses: ImageAnalysis[], threshold: number) => {
   const stats = {
@@ -210,10 +163,10 @@ export const generateReport = (analyses: ImageAnalysis[], threshold: number) => 
     acceptableCount: analyses.filter(a => a.compositeScore?.recommendation === 'acceptable').length,
     poorCount: analyses.filter(a => a.compositeScore?.recommendation === 'poor').length,
     unsuitableCount: analyses.filter(a => a.compositeScore?.recommendation === 'unsuitable').length,
-    averageBlurScore: analyses.length > 0 ? analyses.reduce((sum, a) => sum + a.blurScore, 0) / analyses.length : 0,
-    averageCompositeScore: analyses.length > 0 ? analyses.reduce((sum, a) => sum + (a.compositeScore?.overall || 0), 0) / analyses.length : 0,
-    averageDescriptorScore: analyses.length > 0 ? analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.photogrammetricScore || 0), 0) / analyses.length : 0,
-    averageKeypointCount: analyses.length > 0 ? analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.keypointCount || 0), 0) / analyses.length : 0,
+    averageBlurScore: analyses.reduce((sum, a) => sum + a.blurScore, 0) / analyses.length,
+    averageCompositeScore: analyses.reduce((sum, a) => sum + (a.compositeScore?.overall || 0), 0) / analyses.length,
+    averageDescriptorScore: analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.photogrammetricScore || 0), 0) / analyses.length,
+    averageKeypointCount: analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.keypointCount || 0), 0) / analyses.length,
     recommendedForReconstruction: analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold).length
   };
   
