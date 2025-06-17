@@ -165,4 +165,9 @@ export interface ProcessingProgress {
   current: number;
   total: number;
   isProcessing: boolean;
+  startTime?: number;
+  currentImageName?: string;
+  currentStep?: number;
+  currentStepName?: string;
+  currentImageProgress?: number;
 }
