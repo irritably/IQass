@@ -5,14 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:debug": "vite --mode development --debug",
-    "dev:performance": "vite --mode development --open --host",
     "build": "vite build",
-    "build:analyze": "vite build --mode analyze",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "test:performance": "echo 'Performance tests would run here'",
-    "analyze:bundle": "npx vite-bundle-analyzer dist"
+    "preview": "vite preview"
   },
   "dependencies": {
     "exifr": "^7.1.3",
