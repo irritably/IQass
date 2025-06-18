@@ -1,18 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import { Header } from './components/Header';
-import { FileUpload } from './components/FileUpload';
-import { ProgressBar } from './components/ProgressBar';
-import { QualitySettings } from './components/QualitySettings';
-import { StatsOverview } from './components/StatsOverview';
-import { ImageGrid } from './components/ImageGrid';
-import { QualityHistogram } from './components/QualityHistogram';
-import { ReportExport } from './components/ReportExport';
+import { CompactUpload } from './components/CompactUpload';
+import { QualitySidebar } from './components/QualitySidebar';
+import { WorkspaceArea } from './components/WorkspaceArea';
+import { FloatingResultCard } from './components/FloatingResultCard';
 import { SessionManager } from './components/SessionManager';
 import { ImageAnalysis, ProcessingProgress, AnalysisStats } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
 import { calculateQualityStatistics } from './utils/qualityAssessment';
 import { AnalysisSession } from './utils/sessionManager';
-import { Save } from 'lucide-react';
+import { Camera, Zap, Activity } from 'lucide-react';
 
 function App() {
   const [analyses, setAnalyses] = useState<ImageAnalysis[]>([]);
@@ -21,8 +17,9 @@ function App() {
     total: 0,
     isProcessing: false
   });
-  const [threshold, setThreshold] = useState(70); // Default threshold for composite scoring
+  const [threshold, setThreshold] = useState(70);
   const [showSessionManager, setShowSessionManager] = useState(false);
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set());
 
   /**
    * Calculates comprehensive statistics for all analyzed images
@@ -30,7 +27,6 @@ function App() {
   const calculateStats = useCallback((analyses: ImageAnalysis[]): AnalysisStats => {
     const baseStats = calculateQualityStatistics(analyses, threshold);
     
-    // Calculate additional metrics for the stats overview
     const averageExposureScore = analyses.length > 0
       ? analyses.reduce((sum, a) => sum + (a.exposureAnalysis?.exposureScore || 0), 0) / analyses.length
       : 0;
@@ -53,7 +49,7 @@ function App() {
       averageNoiseScore,
       averageDescriptorScore,
       averageKeypointCount,
-      cameraStats: {}, // TODO: Implement camera statistics aggregation
+      cameraStats: {},
       qualityDistribution: {
         excellent: baseStats.excellentCount,
         good: baseStats.goodCount,
@@ -80,13 +76,12 @@ function App() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      // Update progress with current image info
       setProgress(prev => ({
         ...prev,
         current: i,
         currentImageName: file.name,
         currentStep: 1,
-        currentStepName: 'Loading image...',
+        currentStepName: 'Analyzing...',
         currentImageProgress: 0
       }));
 
@@ -94,7 +89,6 @@ function App() {
         const analysis = await analyzeImage(file);
         newAnalyses.push(analysis);
       } catch (error) {
-        // Create error analysis if processing fails
         newAnalyses.push({
           id: Math.random().toString(36).substr(2, 9),
           file,
@@ -108,18 +102,15 @@ function App() {
         });
       }
 
-      // Update progress
       setProgress(prev => ({
         ...prev,
         current: i + 1,
         currentImageProgress: 100
       }));
 
-      // Update analyses incrementally for better UX
       setAnalyses(prev => [...prev, ...newAnalyses.slice(i, i + 1)]);
     }
 
-    // Mark processing as complete
     setProgress(prev => ({
       ...prev,
       isProcessing: false,
@@ -146,69 +137,77 @@ function App() {
   const stats = calculateStats(analyses);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Upload Section */}
-          <FileUpload 
-            onFilesSelected={handleFilesSelected}
-            isProcessing={progress.isProcessing}
-          />
-
-          {/* Progress Bar */}
-          <ProgressBar progress={progress} />
-
-          {/* Settings with Live Visualization */}
-          {analyses.length > 0 && (
-            <QualitySettings 
-              threshold={threshold}
-              onThresholdChange={setThreshold}
-              analyses={analyses}
-            />
-          )}
-
-          {/* Stats Overview */}
-          {analyses.length > 0 && (
-            <StatsOverview stats={stats} threshold={threshold} />
-          )}
-
-          {/* Quality Histogram - Compact Version */}
-          {analyses.length > 0 && (
-            <QualityHistogram analyses={analyses} compact={true} />
-          )}
-
-          {/* Image Grid with Comparison Features */}
-          <ImageGrid analyses={analyses} threshold={threshold} />
-
-          {/* Session Management and Export Section */}
-          {analyses.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Session Management */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Save className="w-5 h-5 mr-2" />
-                  Session Management
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Save your current analysis session to continue later or share with your team.
-                </p>
-                <button
-                  onClick={() => setShowSessionManager(true)}
-                  className="w-full flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  <Save className="w-5 h-5 mr-2" />
-                  Manage Sessions
-                </button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Futuristic Header */}
+      <header className="relative bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-lg">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo & Title */}
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Camera className="w-7 h-7 text-white" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse" />
               </div>
-
-              {/* Export Section */}
-              <ReportExport analyses={analyses} threshold={threshold} />
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  Drone Quality AI
+                </h1>
+                <p className="text-sm text-gray-500 font-medium">Real-time photogrammetric analysis</p>
+              </div>
             </div>
-          )}
+
+            {/* Status Indicators */}
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-100 rounded-full">
+                <Activity className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700">
+                  {analyses.length} analyzed
+                </span>
+              </div>
+              
+              {progress.isProcessing && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-100 rounded-full">
+                  <Zap className="w-4 h-4 text-blue-600 animate-pulse" />
+                  <span className="text-sm font-medium text-blue-700">
+                    Processing...
+                  </span>
+                </div>
+              )}
+
+              {/* Compact Upload in Top Right */}
+              <CompactUpload 
+                onFilesSelected={handleFilesSelected}
+                isProcessing={progress.isProcessing}
+                progress={progress}
+              />
+            </div>
+          </div>
         </div>
-      </main>
+      </header>
+
+      <div className="flex h-[calc(100vh-80px)]">
+        {/* Quality Control Sidebar */}
+        <QualitySidebar
+          threshold={threshold}
+          onThresholdChange={setThreshold}
+          analyses={analyses}
+          stats={stats}
+          onOpenSessionManager={() => setShowSessionManager(true)}
+        />
+
+        {/* Main Workspace */}
+        <main className="flex-1 overflow-hidden">
+          <WorkspaceArea
+            analyses={analyses}
+            threshold={threshold}
+            selectedCards={selectedCards}
+            onCardSelect={setSelectedCards}
+            progress={progress}
+          />
+        </main>
+      </div>
 
       {/* Session Manager Modal */}
       <SessionManager
