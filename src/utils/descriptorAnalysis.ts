@@ -9,6 +9,8 @@ export interface Keypoint {
   type: 'corner' | 'edge' | 'blob' | 'textured';
 }
 
+const MAX_KEYPOINTS_PER_DETECTOR = 500; // Limit keypoints per detector to prevent stack overflow
+
 export const analyzeDescriptors = (imageData: ImageData): DescriptorAnalysis => {
   const { data, width, height } = imageData;
   
@@ -66,23 +68,35 @@ const extractKeypoints = (data: Uint8ClampedArray, width: number, height: number
     grayscale[i / 4] = gray;
   }
   
-  // Harris corner detection
+  // Harris corner detection - limit and sort before adding
   const harrisKeypoints = harrisCornerDetection(grayscale, width, height);
-  keypoints.push(...harrisKeypoints);
+  const limitedHarris = harrisKeypoints
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+  keypoints.push(...limitedHarris);
   
-  // FAST corner detection
+  // FAST corner detection - limit and sort before adding
   const fastKeypoints = fastCornerDetection(grayscale, width, height);
-  keypoints.push(...fastKeypoints);
+  const limitedFast = fastKeypoints
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+  keypoints.push(...limitedFast);
   
-  // Edge detection (Canny-based)
+  // Edge detection - limit and sort before adding
   const edgeKeypoints = edgeBasedKeypoints(grayscale, width, height);
-  keypoints.push(...edgeKeypoints);
+  const limitedEdge = edgeKeypoints
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+  keypoints.push(...limitedEdge);
   
-  // Blob detection (LoG approximation)
+  // Blob detection - limit and sort before adding
   const blobKeypoints = blobDetection(grayscale, width, height);
-  keypoints.push(...blobKeypoints);
+  const limitedBlob = blobKeypoints
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+  keypoints.push(...limitedBlob);
   
-  // Remove duplicates and sort by strength
+  // Remove duplicates and sort by strength - now with manageable array size
   const uniqueKeypoints = removeDuplicateKeypoints(keypoints);
   return uniqueKeypoints.sort((a, b) => b.strength - a.strength).slice(0, 2000); // Limit to top 2000
 };
