@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ImageAnalysis } from '../types';
-import { Camera, Aperture, Zap, Gauge, MapPin, Calendar, Settings, Target, Grid, Layers, ChevronDown, ChevronRight, Info, Eye, Lightbulb, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Camera, Aperture, Zap, Gauge, MapPin, Calendar, Settings, Target, Grid, Layers, ChevronDown, ChevronRight, Info, Eye } from 'lucide-react';
 import { getScoreColor, getRecommendationColor } from '../utils/compositeScoring';
 import { DebugVisualizationModal } from './DebugVisualizationModal';
 
@@ -16,7 +16,6 @@ interface CollapsibleSectionProps {
   children: React.ReactNode;
   badge?: string;
   badgeColor?: string;
-  recommendations?: string[];
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -26,8 +25,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onToggle,
   children,
   badge,
-  badgeColor = 'bg-blue-100 text-blue-800',
-  recommendations = []
+  badgeColor = 'bg-blue-100 text-blue-800'
 }) => (
   <div className="border border-gray-200 rounded-lg overflow-hidden">
     <button
@@ -50,31 +48,8 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       )}
     </button>
     {isExpanded && (
-      <div className="bg-white">
-        <div className="p-4">
-          {children}
-        </div>
-        {/* Contextual Recommendations */}
-        {recommendations.length > 0 && (
-          <div className="px-4 pb-4">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-start space-x-2">
-                <Lightbulb className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h5 className="text-sm font-medium text-amber-900 mb-1">Recommendations</h5>
-                  <ul className="text-sm text-amber-800 space-y-1">
-                    {recommendations.map((rec, index) => (
-                      <li key={index} className="flex items-start space-x-1">
-                        <span className="text-amber-600 mt-1">•</span>
-                        <span>{rec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="p-4 bg-white">
+        {children}
       </div>
     )}
   </div>
@@ -106,89 +81,6 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
   }
 
   const { compositeScore, exposureAnalysis, noiseAnalysis, metadata, descriptorAnalysis } = analysis;
-
-  // Generate contextual recommendations based on scores
-  const getExposureRecommendations = (): string[] => {
-    const recommendations: string[] = [];
-    
-    if (exposureAnalysis.exposureScore < 60) {
-      if (exposureAnalysis.overexposurePercentage > 5) {
-        recommendations.push("Reduce exposure or use graduated ND filters to prevent highlight clipping");
-      }
-      if (exposureAnalysis.underexposurePercentage > 5) {
-        recommendations.push("Increase exposure or use exposure bracketing for better shadow detail");
-      }
-      if (exposureAnalysis.dynamicRange < 150) {
-        recommendations.push("Consider HDR capture or exposure bracketing for high-contrast scenes");
-      }
-    }
-    
-    if (exposureAnalysis.localContrast < 25) {
-      recommendations.push("Increase local contrast in post-processing or capture during better lighting conditions");
-    }
-    
-    return recommendations;
-  };
-
-  const getNoiseRecommendations = (): string[] => {
-    const recommendations: string[] = [];
-    
-    if (noiseAnalysis.noiseScore < 70) {
-      if (metadata?.settings.iso && metadata.settings.iso > 800) {
-        recommendations.push("Lower ISO settings (≤800) to reduce noise in future captures");
-      }
-      if (noiseAnalysis.compressionArtifacts > 10) {
-        recommendations.push("Use higher quality JPEG settings or shoot in RAW format");
-      }
-      if (noiseAnalysis.chromaticAberration > 10) {
-        recommendations.push("Enable lens corrections in camera or apply chromatic aberration correction in post");
-      }
-    }
-    
-    return recommendations;
-  };
-
-  const getFeatureRecommendations = (): string[] => {
-    const recommendations: string[] = [];
-    
-    if (descriptorAnalysis) {
-      if (descriptorAnalysis.keypointCount < 500) {
-        recommendations.push("Ensure sufficient texture and detail in the scene for better feature detection");
-        recommendations.push("Avoid smooth surfaces like water or uniform fields when possible");
-      }
-      
-      if (descriptorAnalysis.keypointDistribution.uniformity < 60) {
-        recommendations.push("Improve flight planning to ensure more uniform feature distribution across images");
-      }
-      
-      if (descriptorAnalysis.descriptorQuality.matchability < 70) {
-        recommendations.push("Increase image overlap (80%+ forward, 60%+ side) for better feature matching");
-        recommendations.push("Maintain consistent altitude and camera settings throughout the flight");
-      }
-    }
-    
-    return recommendations;
-  };
-
-  const getCameraRecommendations = (): string[] => {
-    const recommendations: string[] = [];
-    
-    if (metadata?.settings) {
-      if (metadata.settings.iso && metadata.settings.iso > 400) {
-        recommendations.push("Use lower ISO settings (≤400) for optimal image quality");
-      }
-      
-      if (metadata.settings.aperture && metadata.settings.aperture < 4) {
-        recommendations.push("Consider using f/4-f/8 for optimal lens sharpness and depth of field");
-      }
-      
-      if (!metadata.settings.shutterSpeed) {
-        recommendations.push("Ensure fast enough shutter speed (1/500s+) to prevent motion blur");
-      }
-    }
-    
-    return recommendations;
-  };
 
   return (
     <>
@@ -243,26 +135,19 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
 
           {/* Quick Recommendation */}
           <div className={`p-4 rounded-lg border ${getRecommendationColor(compositeScore.recommendation)}`}>
-            <div className="flex items-start space-x-2">
-              {compositeScore.recommendation === 'excellent' && <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />}
-              {(compositeScore.recommendation === 'poor' || compositeScore.recommendation === 'unsuitable') && <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />}
-              {(compositeScore.recommendation === 'good' || compositeScore.recommendation === 'acceptable') && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
-              <div>
-                <h4 className="font-medium mb-2">Recommendation</h4>
-                <p className="text-sm">
-                  {compositeScore.recommendation === 'excellent' && 
-                    'This image is excellent for photogrammetric reconstruction with high-quality features and optimal exposure.'}
-                  {compositeScore.recommendation === 'good' && 
-                    'This image is good for reconstruction and should produce reliable results in most scenarios.'}
-                  {compositeScore.recommendation === 'acceptable' && 
-                    'This image is acceptable for reconstruction but may require additional overlap or careful processing.'}
-                  {compositeScore.recommendation === 'poor' && 
-                    'This image has quality issues that may affect reconstruction accuracy. Consider retaking if possible.'}
-                  {compositeScore.recommendation === 'unsuitable' && 
-                    'This image is not recommended for photogrammetric reconstruction due to significant quality issues.'}
-                </p>
-              </div>
-            </div>
+            <h4 className="font-medium mb-2">Recommendation</h4>
+            <p className="text-sm">
+              {compositeScore.recommendation === 'excellent' && 
+                'This image is excellent for photogrammetric reconstruction with high-quality features and optimal exposure.'}
+              {compositeScore.recommendation === 'good' && 
+                'This image is good for reconstruction and should produce reliable results in most scenarios.'}
+              {compositeScore.recommendation === 'acceptable' && 
+                'This image is acceptable for reconstruction but may require additional overlap or careful processing.'}
+              {compositeScore.recommendation === 'poor' && 
+                'This image has quality issues that may affect reconstruction accuracy. Consider retaking if possible.'}
+              {compositeScore.recommendation === 'unsuitable' && 
+                'This image is not recommended for photogrammetric reconstruction due to significant quality issues.'}
+            </p>
           </div>
 
           {/* Debug Visualization Button */}
@@ -290,7 +175,6 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
           onToggle={() => toggleSection('exposure')}
           badge={`${exposureAnalysis.exposureScore}/100`}
           badgeColor={`${getScoreColor(exposureAnalysis.exposureScore).replace('text-', 'bg-').replace('-600', '-100')} ${getScoreColor(exposureAnalysis.exposureScore).replace('-600', '-800')}`}
-          recommendations={getExposureRecommendations()}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
@@ -361,7 +245,6 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
             onToggle={() => toggleSection('features')}
             badge={`${descriptorAnalysis.keypointCount} keypoints`}
             badgeColor="bg-cyan-100 text-cyan-800"
-            recommendations={getFeatureRecommendations()}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
@@ -434,7 +317,6 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
           onToggle={() => toggleSection('noise')}
           badge={`${noiseAnalysis.noiseScore}/100`}
           badgeColor={`${getScoreColor(noiseAnalysis.noiseScore).replace('text-', 'bg-').replace('-600', '-100')} ${getScoreColor(noiseAnalysis.noiseScore).replace('-600', '-800')}`}
-          recommendations={getNoiseRecommendations()}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 text-sm">
@@ -491,7 +373,6 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
             isExpanded={expandedSections.has('metadata')}
             onToggle={() => toggleSection('metadata')}
             badge={metadata.camera.make && metadata.camera.model ? `${metadata.camera.make} ${metadata.camera.model}` : 'Available'}
-            recommendations={getCameraRecommendations()}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
               {metadata.camera.make && metadata.camera.model && (

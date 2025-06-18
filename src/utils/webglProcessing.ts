@@ -86,7 +86,7 @@ const getLaplacianFragmentShader = (useHighPrecision: boolean = false) => `
 `;
 
 /**
- * Fixed Fragment shader for Harris corner detection with proper visualization
+ * Fragment shader for Harris corner detection with high precision
  */
 const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
   precision ${useHighPrecision ? 'highp' : 'mediump'} float;
@@ -98,61 +98,29 @@ const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
   void main() {
     vec2 onePixel = vec2(1.0) / u_textureSize;
     
-    // Convert to grayscale first
-    vec3 center = texture2D(u_image, v_texCoord).rgb;
-    float gray = dot(center, vec3(0.299, 0.587, 0.114));
+    // Calculate gradients with higher precision
+    float Ix = (
+      texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).r -
+      texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).r
+    ) * 0.5;
     
-    // Calculate gradients using Sobel operators
-    float Ix = 0.0;
-    float Iy = 0.0;
+    float Iy = (
+      texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).r -
+      texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).r
+    ) * 0.5;
     
-    // Sobel X kernel
-    Ix += dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * -1.0;
-    Ix += dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114)) * -2.0;
-    Ix += dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * -1.0;
-    Ix += dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * 1.0;
-    Ix += dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114)) * 2.0;
-    Ix += dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * 1.0;
+    // Harris matrix elements with Gaussian-like weighting
+    float weight = 1.0; // Could be enhanced with actual Gaussian
+    float Ixx = Ix * Ix * weight;
+    float Iyy = Iy * Iy * weight;
+    float Ixy = Ix * Iy * weight;
     
-    // Sobel Y kernel
-    Iy += dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * -1.0;
-    Iy += dot(texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * -2.0;
-    Iy += dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * -1.0;
-    Iy += dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * 1.0;
-    Iy += dot(texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * 2.0;
-    Iy += dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) * 1.0;
-    
-    // Harris matrix elements
-    float Ixx = Ix * Ix;
-    float Iyy = Iy * Iy;
-    float Ixy = Ix * Iy;
-    
-    // Harris response calculation
+    // Harris response with higher precision
     float det = Ixx * Iyy - Ixy * Ixy;
     float trace = Ixx + Iyy;
     float response = det - u_k * trace * trace;
     
-    // Normalize and visualize the response with color mapping
-    float normalizedResponse = response * 10000.0; // Scale for visibility
-    float visualResponse = clamp(abs(normalizedResponse), 0.0, 1.0);
-    
-    // Create a heat map visualization
-    vec3 color;
-    if (visualResponse > 0.8) {
-      // Strong corners - red
-      color = vec3(1.0, 0.0, 0.0);
-    } else if (visualResponse > 0.5) {
-      // Medium corners - yellow
-      color = vec3(1.0, 1.0, 0.0);
-    } else if (visualResponse > 0.2) {
-      // Weak corners - green
-      color = vec3(0.0, 1.0, 0.0);
-    } else {
-      // No corners - blue to black gradient
-      color = vec3(0.0, 0.0, visualResponse * 2.0);
-    }
-    
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(response, response, response, 1.0);
   }
 `;
 
@@ -366,7 +334,7 @@ const getProgram = (
 /**
  * Performance benchmarking utility
  */
-export const benchmarkOperation = async <T>(
+const benchmarkOperation = async <T>(
   operation: string,
   cpuFunction: () => Promise<T> | T,
   gpuFunction: () => Promise<T> | T,
@@ -650,7 +618,7 @@ export const detectCornersWebGL = (
  */
 export const generateDebugVisualization = async (
   imageData: ImageData,
-  operation: 'laplacian' | 'harris'
+  operation: 'laplacian' | 'sobel' | 'harris'
 ): Promise<ImageData | null> => {
   const capabilities = getWebGLCapabilities();
   if (!capabilities.webgl) return null;
@@ -687,10 +655,6 @@ export const generateDebugVisualization = async (
     // Create texture from image data
     const texture = createTextureFromImageData(gl, imageData);
     if (!texture) return null;
-
-    // Clear the canvas with black background
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
 
     // Use the program
     gl.useProgram(program);
@@ -775,3 +739,8 @@ export const cleanupWebGL = () => {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', cleanupWebGL);
 }
+
+/**
+ * Export benchmarking utility for external use
+ */
+export { benchmarkOperation };
