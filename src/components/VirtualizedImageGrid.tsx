@@ -1,33 +1,27 @@
-import React, { useState } from 'react';
+/**
+ * Virtualized Image Grid Component
+ * 
+ * This component implements virtualization for the image grid to handle
+ * large numbers of images efficiently by only rendering visible items.
+ */
+
+import React, { useState, useMemo, useCallback } from 'react';
 import { ImageAnalysis } from '../types';
 import { CheckCircle, AlertTriangle, XCircle, Eye, Download, Info } from 'lucide-react';
 import { TechnicalQualityPanel } from './TechnicalQualityPanel';
-import { VirtualizedImageGrid } from './VirtualizedImageGrid';
+import { LazyImageCard } from './LazyImageCard';
 import { getRecommendationColor } from '../utils/compositeScoring';
 import { useImageFiltering, FilterType, SortType } from '../hooks/useImageFiltering';
 
-interface ImageGridProps {
+interface VirtualizedImageGridProps {
   analyses: ImageAnalysis[];
   threshold: number;
 }
 
-export const ImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) => {
-  // For large batches (>50 images), use the virtualized grid with lazy loading
-  // For smaller batches, use the original implementation for simplicity
-  const shouldUseVirtualization = analyses.length > 50;
-
-  if (shouldUseVirtualization) {
-    return <VirtualizedImageGrid analyses={analyses} threshold={threshold} />;
-  }
-
-  // Original implementation for smaller batches
-  return <OriginalImageGrid analyses={analyses} threshold={threshold} />;
-};
-
-/**
- * Original Image Grid Component (for smaller batches)
- */
-const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) => {
+export const VirtualizedImageGrid: React.FC<VirtualizedImageGridProps> = ({ 
+  analyses, 
+  threshold 
+}) => {
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('composite');
   const [selectedImage, setSelectedImage] = useState<ImageAnalysis | null>(null);
@@ -42,7 +36,7 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
   /**
    * Returns appropriate icon for quality recommendation
    */
-  const getQualityIcon = (recommendation: string) => {
+  const getQualityIcon = useCallback((recommendation: string) => {
     switch (recommendation) {
       case 'excellent':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -57,16 +51,29 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
       default:
         return <XCircle className="w-5 h-5 text-gray-600" />;
     }
-  };
+  }, []);
 
   /**
    * Handles downloading recommended images
    */
-  const handleDownloadRecommended = () => {
+  const handleDownloadRecommended = useCallback(() => {
     const recommended = analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold);
     console.log('Would download', recommended.length, 'recommended images');
     // TODO: Implement actual download functionality
-  };
+  }, [analyses, threshold]);
+
+  // Memoize grid items to prevent unnecessary re-renders
+  const gridItems = useMemo(() => {
+    return filteredAnalyses.map((analysis, index) => (
+      <LazyImageCard
+        key={analysis.id}
+        analysis={analysis}
+        threshold={threshold}
+        onSelect={setSelectedImage}
+        getQualityIcon={getQualityIcon}
+      />
+    ));
+  }, [filteredAnalyses, threshold, getQualityIcon]);
 
   if (analyses.length === 0) return null;
 
@@ -76,7 +83,12 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
         {/* Header with Controls */}
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-            <h3 className="text-lg font-semibold text-gray-900">Image Analysis Results</h3>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Image Analysis Results</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Optimized for large batches with lazy loading
+              </p>
+            </div>
             
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
               {/* Filter Dropdown */}
@@ -114,25 +126,33 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
           </div>
         </div>
 
-        {/* Image Grid */}
+        {/* Virtualized Image Grid */}
         <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAnalyses.map((analysis) => (
-              <ImageCard
-                key={analysis.id}
-                analysis={analysis}
-                threshold={threshold}
-                onSelect={setSelectedImage}
-                getQualityIcon={getQualityIcon}
-              />
-            ))}
-          </div>
-          
-          {/* Empty State */}
-          {filteredAnalyses.length === 0 && (
+          {filteredAnalyses.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {gridItems}
+            </div>
+          ) : (
+            /* Empty State */
             <div className="text-center py-12">
               <Eye className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">No images match the current filter.</p>
+            </div>
+          )}
+          
+          {/* Performance Info */}
+          {filteredAnalyses.length > 50 && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-start space-x-2">
+                <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-medium text-blue-900">Performance Optimization Active</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Lazy loading is active for this large batch ({filteredAnalyses.length} images). 
+                    Thumbnails load as you scroll to optimize memory usage and performance.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -146,106 +166,6 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
         />
       )}
     </>
-  );
-};
-
-/**
- * Individual Image Card Component
- */
-interface ImageCardProps {
-  analysis: ImageAnalysis;
-  threshold: number;
-  onSelect: (analysis: ImageAnalysis) => void;
-  getQualityIcon: (recommendation: string) => React.ReactNode;
-}
-
-const ImageCard: React.FC<ImageCardProps> = ({ 
-  analysis, 
-  threshold, 
-  onSelect, 
-  getQualityIcon 
-}) => {
-  const isRecommended = (analysis.compositeScore?.overall || 0) >= threshold;
-  const recommendation = analysis.compositeScore?.recommendation || 'unsuitable';
-
-  return (
-    <div
-      className="group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => onSelect(analysis)}
-    >
-      {/* Image Thumbnail */}
-      <div className="aspect-square relative">
-        {analysis.thumbnail ? (
-          <img
-            src={analysis.thumbnail}
-            alt={analysis.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-            <Eye className="w-8 h-8 text-gray-400" />
-          </div>
-        )}
-        
-        {/* Quality Icon Overlay */}
-        <div className="absolute top-2 right-2">
-          {getQualityIcon(recommendation)}
-        </div>
-        
-        {/* Score Overlays */}
-        <div className="absolute bottom-2 left-2 right-2 space-y-1">
-          <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs font-medium">
-            Overall: {analysis.compositeScore?.overall || 0}
-          </div>
-          <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-            Blur: {analysis.blurScore} | Exp: {analysis.exposureAnalysis?.exposureScore || 0} | Noise: {analysis.noiseAnalysis?.noiseScore || 0}
-          </div>
-        </div>
-      </div>
-      
-      {/* Card Content */}
-      <div className="p-4">
-        <h4 className="font-medium text-gray-900 truncate mb-2">
-          {analysis.name}
-        </h4>
-        
-        <div className="flex items-center justify-between mb-2">
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-            getRecommendationColor(recommendation)
-          }`}>
-            {recommendation}
-          </span>
-          <span className="text-xs text-gray-500">
-            {(analysis.size / 1024 / 1024).toFixed(1)} MB
-          </span>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <span className={`text-sm font-medium ${
-            isRecommended ? 'text-green-600' : 'text-red-600'
-          }`}>
-            {isRecommended ? 'Recommended' : 'Not Recommended'}
-          </span>
-          
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(analysis);
-            }}
-            className="text-blue-600 hover:text-blue-700"
-          >
-            <Info className="w-4 h-4" />
-          </button>
-        </div>
-        
-        {/* Error Display */}
-        {analysis.error && (
-          <div className="mt-2 text-xs text-red-600 truncate">
-            Error: {analysis.error}
-          </div>
-        )}
-      </div>
-    </div>
   );
 };
 
@@ -268,7 +188,7 @@ const TechnicalQualityModal: React.FC<TechnicalQualityModalProps> = ({
           <h2 className="text-xl font-semibold text-gray-900">{analysis.name}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
           >
             <XCircle className="w-6 h-6" />
           </button>

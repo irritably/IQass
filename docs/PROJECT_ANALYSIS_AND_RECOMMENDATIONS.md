@@ -13,6 +13,7 @@ The application features a clean, professional interface with a clear layout for
 *   **Limited Customization**: Fixed quality threshold, no presets for analysis configurations, and inflexible filtering options.
 *   **Export and Integration Gaps**: Limited export formats and no direct integration with external photogrammetry software.
 *   **Mobile and Accessibility Concerns**: Primarily desktop-focused design, limited keyboard navigation, and small touch targets for tablet use.
+*   **Memory Usage in Large Batches**: All image thumbnails are rendered simultaneously, causing memory issues with large image sets.
 
 ### Suggested UI/UX Improvements
 
@@ -61,6 +62,15 @@ The application features a clean, professional interface with a clear layout for
     *   **Recommendation**: Implement a full responsive redesign for tablet use (minimum 768px width), optimizing touch interactions and simplifying navigation for smaller screens. This includes adjusting grid layouts, font sizes, and touch target sizes.
         *   **File**: `src/App.tsx`, `src/components/**/*.tsx`, `src/index.css`
 
+*   **Lazy Load Image Previews in Grid**
+    *   **Priority**: High
+    *   **Effort**: Medium
+    *   **Impact**: Dramatically reduces memory usage and improves performance when handling large batches of images (100+ images).
+    *   **Dependencies**: Intersection Observer API, virtualization logic.
+    *   **Risks**: Complexity in managing viewport calculations and scroll performance.
+    *   **Recommendation**: Implement lazy loading for image thumbnails in the results grid using Intersection Observer API. Only render thumbnails when they scroll into view, and unload them when they scroll out. This prevents memory exhaustion with large image batches.
+        *   **File**: `src/components/ImageGrid.tsx`, new hook `src/hooks/useLazyLoading.ts`
+
 ## 2. Features & Functionality
 
 ### Current Feature Set
@@ -103,6 +113,15 @@ The application provides core functionalities for drone image quality analysis, 
     *   **Risks**: Complexity in data aggregation and UI design.
     *   **Recommendation**: Develop a dedicated dashboard view that aggregates statistics across multiple analysis sessions or large batches. Include features like trend analysis over time, comparative analysis between different flights, and more detailed quality distribution charts.
         *   **File**: New components for dashboard, `src/App.tsx` for routing.
+
+*   **Use WebGL for Blur & Feature Analysis (Future-Proofing)**
+    *   **Priority**: Low
+    *   **Effort**: High
+    *   **Impact**: Provides 10-30x speedup for computationally intensive image processing operations by leveraging GPU acceleration.
+    *   **Dependencies**: WebGL/WebGPU knowledge, shader programming, fallback mechanisms.
+    *   **Risks**: Browser compatibility, increased complexity, debugging challenges with GPU code.
+    *   **Recommendation**: Implement WebGL shaders for performance-critical operations like Laplacian variance calculation (blur detection), edge detection (Sobel), and feature detection algorithms. Use WebGPU where available for even better performance. Maintain CPU fallbacks for compatibility.
+        *   **File**: `src/utils/imageProcessing.ts`, `src/utils/descriptorAnalysis.ts`, new WebGL utilities `src/utils/webglProcessing.ts`
 
 ## 3. Security & Stability
 
@@ -190,8 +209,9 @@ The project demonstrates good maintainability with a clear React component struc
 
 ### Short-term Goals (High Priority, Medium-High Effort)
 1. Web Workers for Parallel Processing
-2. Mobile-Responsive Design
-3. Robustness Against Malformed Data
+2. Lazy Load Image Previews in Grid
+3. Mobile-Responsive Design
+4. Robustness Against Malformed Data
 
 ### Medium-term Enhancements (Medium Priority)
 1. Customizable Quality Presets
@@ -202,11 +222,12 @@ The project demonstrates good maintainability with a clear React component struc
 
 ### Long-term Optimizations (Low Priority, High Effort)
 1. Advanced Analytics Dashboard
-2. WebAssembly for Performance-Critical Algorithms
-3. Automated Testing Suite
+2. Use WebGL for Blur & Feature Analysis
+3. WebAssembly for Performance-Critical Algorithms
+4. Automated Testing Suite
 
 ## Conclusion
 
 This comprehensive analysis provides a roadmap for evolving the Drone Image Quality Analyzer into an even more robust, user-friendly, and performant application. The recommendations are prioritized to deliver maximum impact with available resources, focusing first on critical user experience improvements and performance optimizations before moving to advanced features and long-term architectural enhancements.
 
-The project already demonstrates strong technical foundations and thoughtful design principles. By implementing these recommendations systematically, the application can become a best-in-class tool for professional drone image quality assessment.
+The project already demonstrates strong technical foundations and thoughtful design principles. By implementing these recommendations systematically, the application can become a best-in-class tool for professional drone image quality assessment, capable of handling large-scale operations with optimal performance and user experience.
