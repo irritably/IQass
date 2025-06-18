@@ -5,8 +5,6 @@
  * debugging, and optimization of the Drone Image Quality Analyzer.
  */
 
-import React from 'react';
-
 interface PerformanceConfig {
   enableProfiling: boolean;
   enableMemoryTracking: boolean;
@@ -542,6 +540,115 @@ export const usePerformanceMonitoring = () => {
     exportData,
     measurePerformance
   };
+};
+
+// Development-only performance panel component
+export const DevPerformancePanel: React.FC = () => {
+  const { report, generateReport, exportData } = usePerformanceMonitoring();
+  const [isVisible, setIsVisible] = React.useState(false);
+
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+
+  const downloadReport = () => {
+    const data = exportData();
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `performance-report-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <>
+      {/* Toggle Button */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <button
+          onClick={() => setIsVisible(!isVisible)}
+          className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 transition-colors"
+          title="Performance Monitor"
+        >
+          📊
+        </button>
+      </div>
+
+      {/* Performance Panel */}
+      {isVisible && (
+        <div className="fixed bottom-20 right-4 w-96 bg-white border border-gray-300 rounded-lg shadow-xl z-50 max-h-96 overflow-y-auto">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Performance Monitor</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={generateReport}
+                className="text-blue-600 hover:text-blue-700 text-sm"
+              >
+                Refresh
+              </button>
+              <button
+                onClick={downloadReport}
+                className="text-green-600 hover:text-green-700 text-sm"
+              >
+                Export
+              </button>
+              <button
+                onClick={() => setIsVisible(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {report ? (
+              <>
+                {/* Memory Stats */}
+                {report.memory.available && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Memory Usage</h4>
+                    <div className="text-sm space-y-1">
+                      <div>Used: {report.memory.current.usedMB} MB</div>
+                      <div>Growth: {report.memory.growth.growthMB} MB ({report.memory.growth.percentage}%)</div>
+                      <div>Peak: {report.memory.peak.valueMB} MB</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Performance Stats */}
+                {report.performance.available && (
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-2">Performance</h4>
+                    <div className="text-sm space-y-1">
+                      <div>Measurements: {report.performance.overall.totalMeasurements}</div>
+                      <div>Avg Duration: {report.performance.overall.avgDuration}ms</div>
+                      <div>Max Duration: {report.performance.overall.maxDuration}ms</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Recommendations</h4>
+                  <div className="text-sm space-y-1">
+                    {report.recommendations.map((rec, index) => (
+                      <div key={index} className="text-gray-700">{rec}</div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-500">
+                Generating performance report...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
 };
 
 // Auto-cleanup on page unload
