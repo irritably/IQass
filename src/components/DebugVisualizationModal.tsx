@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ImageAnalysis } from '../types';
-import { X, Eye, Zap, Target, Info, Download, AlertTriangle } from 'lucide-react';
+import { X, Eye, Zap, Target, Info, Download } from 'lucide-react';
 import { generateDebugVisualization, getPerformanceStats } from '../utils/webglProcessing';
 
 interface DebugVisualizationModalProps {
@@ -62,7 +62,7 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
 
       // Generate visualization
       const result = await generateDebugVisualization(imageData, type);
-      if (!result) throw new Error('Failed to generate visualization - WebGL may not be available');
+      if (!result) throw new Error('Failed to generate visualization');
 
       // Convert result back to data URL
       const resultCanvas = document.createElement('canvas');
@@ -79,7 +79,6 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
       // Cleanup
       URL.revokeObjectURL(img.src);
     } catch (err) {
-      console.error('Visualization generation failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate visualization');
     } finally {
       setLoading(false);
@@ -195,15 +194,6 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                   </div>
                 </div>
               )}
-
-              {/* WebGL Status */}
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-900 mb-2">WebGL Status</h4>
-                <div className="text-sm text-blue-800">
-                  <p>Debug visualizations use WebGL shaders to show how algorithms process your images.</p>
-                  <p className="mt-1">This helps understand quality scoring and identify potential issues.</p>
-                </div>
-              </div>
             </div>
 
             {/* Visualization Display */}
@@ -218,7 +208,7 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                 <button
                   onClick={downloadVisualization}
                   disabled={!visualizations.has(activeVisualization)}
-                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Download
@@ -227,7 +217,7 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
 
               <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
                 {loading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                       <span className="text-gray-600">Generating visualization...</span>
@@ -236,22 +226,15 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                 )}
 
                 {error && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-10">
-                    <div className="text-center p-6">
-                      <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                      <div className="text-red-600 font-medium mb-2">Visualization Failed</div>
-                      <div className="text-red-500 text-sm max-w-md">{error}</div>
-                      <button
-                        onClick={() => generateVisualization(activeVisualization)}
-                        className="mt-4 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        Retry
-                      </button>
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-50">
+                    <div className="text-center">
+                      <div className="text-red-600 font-medium">Visualization Failed</div>
+                      <div className="text-red-500 text-sm mt-1">{error}</div>
                     </div>
                   </div>
                 )}
 
-                {visualizations.has(activeVisualization) && !loading && !error && (
+                {visualizations.has(activeVisualization) && (
                   <img
                     src={visualizations.get(activeVisualization)}
                     alt={`${activeVisualization} visualization`}
@@ -272,16 +255,7 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                       <p>The Laplacian edge detection highlights areas of rapid intensity change. Brighter areas indicate sharper edges, while darker areas suggest blur or smooth gradients. This visualization helps understand how the blur score is calculated.</p>
                     )}
                     {activeVisualization === 'harris' && (
-                      <div>
-                        <p className="mb-2">The Harris corner detection shows corner response strength using a color-coded heat map:</p>
-                        <ul className="space-y-1 text-xs">
-                          <li><span className="inline-block w-3 h-3 bg-red-500 rounded mr-2"></span>Red: Strong corners (high response)</li>
-                          <li><span className="inline-block w-3 h-3 bg-yellow-500 rounded mr-2"></span>Yellow: Medium corners</li>
-                          <li><span className="inline-block w-3 h-3 bg-green-500 rounded mr-2"></span>Green: Weak corners</li>
-                          <li><span className="inline-block w-3 h-3 bg-blue-500 rounded mr-2"></span>Blue: No significant corners</li>
-                        </ul>
-                        <p className="mt-2">This helps understand feature quality and distribution for image matching.</p>
-                      </div>
+                      <p>The Harris corner detection shows corner response strength. Brighter areas indicate stronger corners that are good for feature matching in photogrammetry. This visualization helps understand feature quality and distribution.</p>
                     )}
                   </div>
                 </div>

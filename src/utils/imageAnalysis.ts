@@ -12,6 +12,7 @@ import { analyzeEnhancedExposure } from './enhancedExposureAnalysis';
 import { analyzeNoise } from './noiseAnalysis';
 import { extractMetadata, calculateTechnicalScore } from './metadataExtraction';
 import { calculateCompositeScore } from './compositeScoring';
+import { analyzeDescriptors } from './descriptorAnalysis';
 import { getQualityLevel, generateQualityReport, exportQualityDataToCSV } from './qualityAssessment';
 
 /**
@@ -66,6 +67,7 @@ export const analyzeImage = async (file: File): Promise<ImageAnalysis> => {
     let blurScore = 0;
     let exposureAnalysis;
     let noiseAnalysis;
+    let descriptorAnalysis;
     
     try {
       // Calculate blur score
@@ -96,11 +98,24 @@ export const analyzeImage = async (file: File): Promise<ImageAnalysis> => {
       noiseAnalysis = createDefaultNoiseAnalysis();
     }
     
+    try {
+      // Analyze descriptors
+      descriptorAnalysis = analyzeDescriptors(imageData);
+      console.log(`Analyzed descriptors for ${file.name}`);
+    } catch (descriptorError) {
+      console.error(`Failed to analyze descriptors for ${file.name}:`, descriptorError);
+      // Create default descriptor analysis
+      descriptorAnalysis = createDefaultDescriptorAnalysis();
+    }
+    
     // Step 5: Calculate derived metrics
+    const technicalScore = calculateTechnicalScore(metadata);
     const compositeScore = calculateCompositeScore(
       blurScore,
       exposureAnalysis.exposureScore,
-      noiseAnalysis.noiseScore
+      noiseAnalysis.noiseScore,
+      technicalScore,
+      descriptorAnalysis.photogrammetricScore
     );
     const quality = getQualityLevel(compositeScore.overall);
     
@@ -117,6 +132,7 @@ export const analyzeImage = async (file: File): Promise<ImageAnalysis> => {
       processed: true,
       exposureAnalysis,
       noiseAnalysis,
+      descriptorAnalysis,
       metadata,
       compositeScore
     };
@@ -188,6 +204,39 @@ const createDefaultNoiseAnalysis = () => ({
   vignetting: 100,
   overallArtifactScore: 100,
   noiseScore: 0
+});
+
+/**
+ * Creates default descriptor analysis when analysis fails
+ */
+const createDefaultDescriptorAnalysis = () => ({
+  keypointCount: 0,
+  keypointDensity: 0,
+  keypointDistribution: {
+    uniformity: 0,
+    coverage: 0,
+    clustering: 100
+  },
+  featureStrength: {
+    average: 0,
+    median: 0,
+    standardDeviation: 0
+  },
+  descriptorQuality: {
+    distinctiveness: 0,
+    repeatability: 0,
+    matchability: 0
+  },
+  photogrammetricScore: 0,
+  reconstructionSuitability: 'unsuitable' as const,
+  featureTypes: {
+    corners: 0,
+    edges: 0,
+    blobs: 0,
+    textured: 0
+  },
+  scaleInvariance: 0,
+  rotationInvariance: 0
 });
 
 // Re-export functions for backward compatibility

@@ -49,6 +49,8 @@ export const calculateQualityStatistics = (analyses: ImageAnalysis[], threshold:
       unsuitableCount: 0,
       averageBlurScore: 0,
       averageCompositeScore: 0,
+      averageDescriptorScore: 0,
+      averageKeypointCount: 0,
       recommendedForReconstruction: 0
     };
   }
@@ -62,6 +64,8 @@ export const calculateQualityStatistics = (analyses: ImageAnalysis[], threshold:
     unsuitableCount: analyses.filter(a => a.compositeScore?.recommendation === 'unsuitable').length,
     averageBlurScore: analyses.reduce((sum, a) => sum + a.blurScore, 0) / analyses.length,
     averageCompositeScore: analyses.reduce((sum, a) => sum + (a.compositeScore?.overall || 0), 0) / analyses.length,
+    averageDescriptorScore: analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.photogrammetricScore || 0), 0) / analyses.length,
+    averageKeypointCount: analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.keypointCount || 0), 0) / analyses.length,
     recommendedForReconstruction: analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold).length
   };
 };
@@ -77,11 +81,14 @@ export const generateImageRecommendations = (analyses: ImageAnalysis[], threshol
     filename: analysis.name,
     blurScore: analysis.blurScore,
     compositeScore: analysis.compositeScore?.overall || 0,
+    descriptorScore: analysis.descriptorAnalysis?.photogrammetricScore || 0,
+    keypointCount: analysis.descriptorAnalysis?.keypointCount || 0,
     quality: analysis.compositeScore?.recommendation || 'unsuitable',
     recommended: (analysis.compositeScore?.overall || 0) >= threshold,
     fileSize: `${(analysis.size / 1024 / 1024).toFixed(2)} MB`,
     exposureScore: analysis.exposureAnalysis?.exposureScore || 0,
     noiseScore: analysis.noiseAnalysis?.noiseScore || 0,
+    photogrammetricSuitability: analysis.descriptorAnalysis?.reconstructionSuitability || 'unsuitable',
     cameraInfo: analysis.metadata?.camera.make && analysis.metadata?.camera.model 
       ? `${analysis.metadata.camera.make} ${analysis.metadata.camera.model}`
       : 'Unknown'
@@ -96,7 +103,9 @@ export const generateImageRecommendations = (analyses: ImageAnalysis[], threshol
 export const exportQualityDataToCSV = (analyses: ImageAnalysis[], threshold: number) => {
   const headers = [
     'Filename', 'Composite Score', 'Blur Score', 'Exposure Score', 'Noise Score', 
-    'Recommendation', 'Recommended for Use', 'File Size (MB)', 'Camera Make', 'Camera Model', 
+    'Technical Score', 'Descriptor Score', 'Keypoint Count', 'Keypoint Density',
+    'Feature Distribution', 'Photogrammetric Suitability', 'Recommendation', 
+    'Recommended for Reconstruction', 'File Size (MB)', 'Camera Make', 'Camera Model', 
     'ISO', 'Aperture', 'Shutter Speed', 'Focal Length', 'Status'
   ];
   
@@ -106,6 +115,12 @@ export const exportQualityDataToCSV = (analyses: ImageAnalysis[], threshold: num
     analysis.blurScore.toString(),
     analysis.exposureAnalysis?.exposureScore?.toString() || '0',
     analysis.noiseAnalysis?.noiseScore?.toString() || '0',
+    '0', // Technical score placeholder
+    analysis.descriptorAnalysis?.photogrammetricScore?.toString() || '0',
+    analysis.descriptorAnalysis?.keypointCount?.toString() || '0',
+    analysis.descriptorAnalysis?.keypointDensity?.toFixed(2) || '0',
+    analysis.descriptorAnalysis?.keypointDistribution?.uniformity?.toString() || '0',
+    analysis.descriptorAnalysis?.reconstructionSuitability || 'unsuitable',
     analysis.compositeScore?.recommendation || 'unsuitable',
     (analysis.compositeScore?.overall || 0) >= threshold ? 'Yes' : 'No',
     (analysis.size / 1024 / 1024).toFixed(2),

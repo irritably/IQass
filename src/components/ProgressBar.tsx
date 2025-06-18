@@ -1,22 +1,12 @@
 import React from 'react';
 import { ProcessingProgress } from '../types';
 import { Clock, Zap, CheckCircle, AlertTriangle } from 'lucide-react';
-import { PerformanceIndicator } from './PerformanceIndicator';
-import { usePerformanceBenchmark } from '../hooks/usePerformanceBenchmark';
 
 interface ProgressBarProps {
   progress: ProcessingProgress;
-  onOpenPerformanceDashboard?: () => void;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({ 
-  progress, 
-  onOpenPerformanceDashboard 
-}) => {
-  const { getCurrentPerformanceStatus, getStats } = usePerformanceBenchmark();
-  const performanceStatus = getCurrentPerformanceStatus();
-  const stats = getStats();
-
+export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   if (!progress.isProcessing && progress.current === 0) return null;
 
   const percentage = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
@@ -39,14 +29,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     }
   };
 
-  const getProcessingSpeed = (): number => {
-    if (progress.current === 0 || !progress.isProcessing) return 0;
+  const getProcessingSpeed = (): string => {
+    if (progress.current === 0 || !progress.isProcessing) return '';
     
     const elapsed = Date.now() - (progress.startTime || Date.now());
-    return progress.current / (elapsed / 1000);
+    const speed = (progress.current / (elapsed / 1000)).toFixed(1);
+    return `${speed} images/sec`;
   };
-
-  const processingSpeed = getProcessingSpeed();
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -134,21 +123,21 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           </span>
         </div>
         
-        {/* Performance Indicator */}
-        <div className="flex items-center justify-center">
-          {(progress.isProcessing || stats) && (
-            <PerformanceIndicator
-              isProcessing={progress.isProcessing}
-              isGpuAccelerated={performanceStatus.isGpuAccelerated}
-              speedup={stats?.local.averageSpeedup}
-              processingSpeed={processingSpeed}
-              onClick={onOpenPerformanceDashboard}
-            />
-          )}
+        {/* Processing Speed */}
+        <div className="flex items-center space-x-2 text-sm">
+          <Zap className="w-4 h-4 text-gray-500" />
+          <span className="text-gray-600">
+            {isComplete 
+              ? 'Analysis finished' 
+              : progress.isProcessing 
+              ? getProcessingSpeed() 
+              : 'Speed: N/A'
+            }
+          </span>
         </div>
         
         {/* Current Status */}
-        <div className="flex items-center justify-end space-x-2 text-sm">
+        <div className="flex items-center space-x-2 text-sm">
           <div className={`w-2 h-2 rounded-full ${
             isComplete 
               ? 'bg-green-500' 
@@ -212,17 +201,6 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
               All images have been successfully analyzed. You can now review the results and export your data.
             </p>
           </div>
-          
-          {/* Performance Summary */}
-          {stats && stats.local.totalBenchmarks > 0 && (
-            <div className="mt-2 pt-2 border-t border-green-200">
-              <p className="text-xs text-green-700">
-                Performance: {stats.local.averageSpeedup.toFixed(1)}x speedup with {
-                  performanceStatus.isGpuAccelerated ? 'GPU acceleration' : 'CPU processing'
-                }
-              </p>
-            </div>
-          )}
         </div>
       )}
     </div>
