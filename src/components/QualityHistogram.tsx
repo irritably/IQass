@@ -4,9 +4,13 @@ import { BarChart3 } from 'lucide-react';
 
 interface QualityHistogramProps {
   analyses: ImageAnalysis[];
+  compact?: boolean;
 }
 
-export const QualityHistogram: React.FC<QualityHistogramProps> = ({ analyses }) => {
+export const QualityHistogram: React.FC<QualityHistogramProps> = ({ 
+  analyses, 
+  compact = false 
+}) => {
   if (analyses.length === 0) return null;
 
   // Calculate histogram data for composite scores
@@ -37,6 +41,60 @@ export const QualityHistogram: React.FC<QualityHistogramProps> = ({ analyses }) 
   });
 
   const maxCount = Math.max(...histogramData.map(d => d.count));
+
+  if (compact) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center space-x-2 mb-3">
+          <BarChart3 className="w-4 h-4 text-gray-600" />
+          <h4 className="text-sm font-medium text-gray-900">Quality Distribution</h4>
+        </div>
+
+        <div className="space-y-2">
+          {histogramData.slice(0, 5).map((data, index) => (
+            <div key={index} className="flex items-center space-x-2">
+              <div className="w-8 text-xs font-medium text-gray-600 text-right">
+                {data.label}
+              </div>
+              <div className="flex-1 relative">
+                <div className="w-full bg-gray-100 rounded-full h-3 relative overflow-hidden">
+                  <div
+                    className={`h-full ${data.color} transition-all duration-500 ease-out`}
+                    style={{ width: `${maxCount > 0 ? (data.count / maxCount) * 100 : 0}%` }}
+                  />
+                  {data.count > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                      {data.count}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="w-8 text-xs text-gray-500 text-right">
+                {data.percentage.toFixed(0)}%
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="text-center">
+              <div className="text-sm font-bold text-green-600">
+                {analyses.filter(a => (a.compositeScore?.overall || 0) >= 80).length}
+              </div>
+              <div className="text-gray-600">Good+</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-bold text-red-600">
+                {analyses.filter(a => (a.compositeScore?.overall || 0) < 50).length}
+              </div>
+              <div className="text-gray-600">Poor</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

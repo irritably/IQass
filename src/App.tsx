@@ -7,9 +7,12 @@ import { StatsOverview } from './components/StatsOverview';
 import { ImageGrid } from './components/ImageGrid';
 import { QualityHistogram } from './components/QualityHistogram';
 import { ReportExport } from './components/ReportExport';
+import { SessionManager } from './components/SessionManager';
 import { ImageAnalysis, ProcessingProgress, AnalysisStats } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
 import { calculateQualityStatistics } from './utils/qualityAssessment';
+import { AnalysisSession } from './utils/sessionManager';
+import { Save } from 'lucide-react';
 
 function App() {
   const [analyses, setAnalyses] = useState<ImageAnalysis[]>([]);
@@ -19,6 +22,7 @@ function App() {
     isProcessing: false
   });
   const [threshold, setThreshold] = useState(70); // Default threshold for composite scoring
+  const [showSessionManager, setShowSessionManager] = useState(false);
 
   /**
    * Calculates comprehensive statistics for all analyzed images
@@ -35,10 +39,20 @@ function App() {
       ? analyses.reduce((sum, a) => sum + (a.noiseAnalysis?.noiseScore || 0), 0) / analyses.length
       : 0;
 
+    const averageDescriptorScore = analyses.length > 0
+      ? analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.photogrammetricScore || 0), 0) / analyses.length
+      : 0;
+
+    const averageKeypointCount = analyses.length > 0
+      ? analyses.reduce((sum, a) => sum + (a.descriptorAnalysis?.keypointCount || 0), 0) / analyses.length
+      : 0;
+
     return {
       ...baseStats,
       averageExposureScore,
       averageNoiseScore,
+      averageDescriptorScore,
+      averageKeypointCount,
       cameraStats: {}, // TODO: Implement camera statistics aggregation
       qualityDistribution: {
         excellent: baseStats.excellentCount,
@@ -116,6 +130,19 @@ function App() {
     }));
   }, []);
 
+  /**
+   * Handles loading a saved session
+   */
+  const handleLoadSession = useCallback((session: AnalysisSession) => {
+    setAnalyses(session.analyses);
+    setThreshold(session.threshold);
+    setProgress({
+      current: 0,
+      total: 0,
+      isProcessing: false
+    });
+  }, []);
+
   const stats = calculateStats(analyses);
 
   return (
@@ -147,18 +174,51 @@ function App() {
             <StatsOverview stats={stats} threshold={threshold} />
           )}
 
-          {/* Quality Histogram */}
+          {/* Quality Histogram - Compact Version */}
           {analyses.length > 0 && (
-            <QualityHistogram analyses={analyses} />
+            <QualityHistogram analyses={analyses} compact={true} />
           )}
 
           {/* Image Grid with Comparison Features */}
           <ImageGrid analyses={analyses} threshold={threshold} />
 
-          {/* Export Section */}
-          <ReportExport analyses={analyses} threshold={threshold} />
+          {/* Session Management and Export Section */}
+          {analyses.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Session Management */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Save className="w-5 h-5 mr-2" />
+                  Session Management
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Save your current analysis session to continue later or share with your team.
+                </p>
+                <button
+                  onClick={() => setShowSessionManager(true)}
+                  className="w-full flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <Save className="w-5 h-5 mr-2" />
+                  Manage Sessions
+                </button>
+              </div>
+
+              {/* Export Section */}
+              <ReportExport analyses={analyses} threshold={threshold} />
+            </div>
+          )}
         </div>
       </main>
+
+      {/* Session Manager Modal */}
+      <SessionManager
+        analyses={analyses}
+        threshold={threshold}
+        stats={stats}
+        onLoadSession={handleLoadSession}
+        isVisible={showSessionManager}
+        onClose={() => setShowSessionManager(false)}
+      />
     </div>
   );
 }
