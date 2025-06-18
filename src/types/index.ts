@@ -171,3 +171,24 @@ export interface ProcessingProgress {
   currentStepName?: string;
   currentImageProgress?: number;
 }
+
+// Navigation types for multi-view layout
+export type ViewType = 'upload' | 'dashboard' | 'results';
+
+export interface NavigationItem {
+  id: ViewType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+}
+
+// Session management for multi-view
+export interface AnalysisSession {
+  id: string;
+  name: string;
+  createdAt: Date;
+  analyses: ImageAnalysis[];
+  threshold: number;
+  stats: AnalysisStats;
+  tags: string[];
+}

@@ -1,24 +1,24 @@
-import React, { useState, useCallback } from 'react';
-import { Header } from './components/Header';
-import { FileUpload } from './components/FileUpload';
-import { ProgressBar } from './components/ProgressBar';
-import { QualitySettings } from './components/QualitySettings';
-import { StatsOverview } from './components/StatsOverview';
-import { ImageGrid } from './components/ImageGrid';
-import { QualityHistogram } from './components/QualityHistogram';
-import { ReportExport } from './components/ReportExport';
-import { ImageAnalysis, ProcessingProgress, AnalysisStats } from './types';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Navigation } from './components/Navigation';
+import { UploadAnalyzeView } from './views/UploadAnalyzeView';
+import { DashboardView } from './views/DashboardView';
+import { AnalysisResultsView } from './views/AnalysisResultsView';
+import { ImageAnalysis, ProcessingProgress, AnalysisStats, ViewType } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
 import { calculateQualityStatistics } from './utils/qualityAssessment';
 
 function App() {
+  // Core application state
   const [analyses, setAnalyses] = useState<ImageAnalysis[]>([]);
   const [progress, setProgress] = useState<ProcessingProgress>({
     current: 0,
     total: 0,
     isProcessing: false
   });
-  const [threshold, setThreshold] = useState(70); // Default threshold for composite scoring
+  const [threshold, setThreshold] = useState(70);
+  
+  // Navigation state
+  const [currentView, setCurrentView] = useState<ViewType>('upload');
 
   /**
    * Calculates comprehensive statistics for all analyzed images
@@ -114,50 +114,60 @@ function App() {
       currentStepName: undefined,
       currentImageProgress: undefined
     }));
+
+    // Auto-navigate to dashboard after processing completes
+    if (newAnalyses.length > 0) {
+      setTimeout(() => setCurrentView('dashboard'), 1000);
+    }
   }, []);
 
-  const stats = calculateStats(analyses);
+  /**
+   * Handles view navigation with smart defaults
+   */
+  const handleViewChange = useCallback((view: ViewType) => {
+    setCurrentView(view);
+  }, []);
+
+  // Calculate stats for current analyses
+  const stats = useMemo(() => calculateStats(analyses), [analyses, calculateStats]);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      {/* Navigation */}
+      <Navigation 
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        analysisCount={analyses.length}
+        isProcessing={progress.isProcessing}
+      />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Upload Section */}
-          <FileUpload 
+      {/* Main Content */}
+      <main>
+        {currentView === 'upload' && (
+          <UploadAnalyzeView
             onFilesSelected={handleFilesSelected}
+            progress={progress}
+            threshold={threshold}
+            onThresholdChange={setThreshold}
+            analyses={analyses}
             isProcessing={progress.isProcessing}
           />
+        )}
 
-          {/* Progress Bar */}
-          <ProgressBar progress={progress} />
+        {currentView === 'dashboard' && (
+          <DashboardView
+            analyses={analyses}
+            threshold={threshold}
+            stats={stats}
+          />
+        )}
 
-          {/* Settings with Live Visualization */}
-          {analyses.length > 0 && (
-            <QualitySettings 
-              threshold={threshold}
-              onThresholdChange={setThreshold}
-              analyses={analyses}
-            />
-          )}
-
-          {/* Stats Overview */}
-          {analyses.length > 0 && (
-            <StatsOverview stats={stats} threshold={threshold} />
-          )}
-
-          {/* Quality Histogram */}
-          {analyses.length > 0 && (
-            <QualityHistogram analyses={analyses} />
-          )}
-
-          {/* Image Grid with Comparison Features */}
-          <ImageGrid analyses={analyses} threshold={threshold} />
-
-          {/* Export Section */}
-          <ReportExport analyses={analyses} threshold={threshold} />
-        </div>
+        {currentView === 'results' && (
+          <AnalysisResultsView
+            analyses={analyses}
+            threshold={threshold}
+          />
+        )}
       </main>
     </div>
   );
