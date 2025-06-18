@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { benchmarkOperation, getPerformanceStats } from '../utils/webglProcessing';
+import { CONFIG } from '../config';
 
 interface BenchmarkResult {
   operation: string;
@@ -25,9 +26,9 @@ interface UseBenchmarkOptions {
 
 export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
   const {
-    enableLogging = process.env.NODE_ENV === 'development',
-    sampleSize = 5,
-    autoOptimize = true
+    enableLogging = CONFIG.BENCHMARK.ENABLE_LOGGING,
+    sampleSize = CONFIG.BENCHMARK.SAMPLE_SIZE,
+    autoOptimize = CONFIG.BENCHMARK.AUTO_OPTIMIZE
   } = options;
 
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult[]>([]);
@@ -230,7 +231,7 @@ export const usePerformanceTimer = () => {
 
     setTimings(prev => ({ ...prev, [label]: duration }));
 
-    if (process.env.NODE_ENV === 'development') {
+    if (CONFIG.BENCHMARK.ENABLE_LOGGING) {
       console.log(`⏱️ ${label}: ${duration.toFixed(2)}ms`);
     }
 

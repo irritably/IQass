@@ -6,6 +6,8 @@ import { VirtualizedImageGrid } from './VirtualizedImageGrid';
 import { ImageComparisonModal } from './ImageComparisonModal';
 import { getRecommendationColor } from '../utils/compositeScoring';
 import { useImageFiltering, FilterType, SortType } from '../hooks/useImageFiltering';
+import { exportQualityDataToCSV } from '../utils/qualityAssessment';
+import { CONFIG } from '../config';
 
 interface ImageGridProps {
   analyses: ImageAnalysis[];
@@ -13,9 +15,9 @@ interface ImageGridProps {
 }
 
 export const ImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) => {
-  // For large batches (>50 images), use the virtualized grid with lazy loading
+  // For large batches, use the virtualized grid with lazy loading
   // For smaller batches, use the original implementation for simplicity
-  const shouldUseVirtualization = analyses.length > 50;
+  const shouldUseVirtualization = analyses.length > CONFIG.QUALITY.VIRTUALIZATION_THRESHOLD;
 
   if (shouldUseVirtualization) {
     return <VirtualizedImageGrid analyses={analyses} threshold={threshold} />;
@@ -67,8 +69,11 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
    */
   const handleDownloadRecommended = () => {
     const recommended = analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold);
-    console.log('Would download', recommended.length, 'recommended images');
-    // TODO: Implement actual download functionality
+    if (recommended.length > 0) {
+      exportQualityDataToCSV(recommended, threshold);
+    } else {
+      console.warn('No recommended images to export');
+    }
   };
 
   /**

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { CONFIG } from '../config';
 
 interface UseLazyLoadingOptions {
   rootMargin?: string;
@@ -26,9 +27,9 @@ interface LazyLoadingState {
  */
 export const useLazyLoading = (options: UseLazyLoadingOptions = {}) => {
   const {
-    rootMargin = '50px',
-    threshold = 0.1,
-    unloadOnExit = false
+    rootMargin = CONFIG.LAZY_LOADING.ROOT_MARGIN,
+    threshold = CONFIG.LAZY_LOADING.THRESHOLD,
+    unloadOnExit = CONFIG.LAZY_LOADING.UNLOAD_ON_EXIT
   } = options;
 
   const [state, setState] = useState<LazyLoadingState>({
@@ -98,8 +99,8 @@ export const useVirtualizedLazyLoading = (
   const itemRefs = useRef<Map<number, HTMLElement>>(new Map());
 
   const {
-    rootMargin = '100px',
-    threshold = 0.1,
+    rootMargin = CONFIG.LAZY_LOADING.ROOT_MARGIN,
+    threshold = CONFIG.LAZY_LOADING.THRESHOLD,
     unloadOnExit = true
   } = options;
 

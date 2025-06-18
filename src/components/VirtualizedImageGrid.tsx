@@ -12,6 +12,8 @@ import { TechnicalQualityPanel } from './TechnicalQualityPanel';
 import { LazyImageCard } from './LazyImageCard';
 import { getRecommendationColor } from '../utils/compositeScoring';
 import { useImageFiltering, FilterType, SortType } from '../hooks/useImageFiltering';
+import { exportQualityDataToCSV } from '../utils/qualityAssessment';
+import { CONFIG } from '../config';
 
 interface VirtualizedImageGridProps {
   analyses: ImageAnalysis[];
@@ -58,8 +60,11 @@ export const VirtualizedImageGrid: React.FC<VirtualizedImageGridProps> = ({
    */
   const handleDownloadRecommended = useCallback(() => {
     const recommended = analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold);
-    console.log('Would download', recommended.length, 'recommended images');
-    // TODO: Implement actual download functionality
+    if (recommended.length > 0) {
+      exportQualityDataToCSV(recommended, threshold);
+    } else {
+      console.warn('No recommended images to export');
+    }
   }, [analyses, threshold]);
 
   // Memoize grid items to prevent unnecessary re-renders
@@ -141,7 +146,7 @@ export const VirtualizedImageGrid: React.FC<VirtualizedImageGridProps> = ({
           )}
           
           {/* Performance Info */}
-          {filteredAnalyses.length > 50 && (
+          {filteredAnalyses.length > CONFIG.QUALITY.VIRTUALIZATION_THRESHOLD && (
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-start space-x-2">
                 <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />

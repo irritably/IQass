@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { Upload, Image as ImageIcon, AlertCircle, X, FolderOpen, FileImage, Tag, Check, AlertTriangle } from 'lucide-react';
+import { CONFIG } from '../config';
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -28,11 +29,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): ValidationError | null => {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/tif'];
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const { SUPPORTED_FORMATS, MAX_FILE_SIZE } = CONFIG.IMAGE;
 
     // Check file type
-    if (!validTypes.includes(file.type.toLowerCase())) {
+    if (!SUPPORTED_FORMATS.includes(file.type.toLowerCase() as any)) {
       return {
         type: 'format',
         message: `Unsupported format: ${file.type || 'unknown'}`,
@@ -41,11 +41,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
     }
 
     // Check file size
-    if (file.size > maxSize) {
+    if (file.size > MAX_FILE_SIZE) {
       return {
         type: 'size',
         message: `File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB`,
-        suggestion: `Maximum size is 50MB. Consider compressing the image or using a different format.`
+        suggestion: `Maximum size is ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB. Consider compressing the image or using a different format.`
       };
     }
 
@@ -122,7 +122,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
             return;
           }
 
-          const size = 80;
+          const size = CONFIG.IMAGE.THUMBNAIL_SIZE;
           const ratio = Math.min(size / img.width, size / img.height);
           const newWidth = Math.floor(img.width * ratio);
           const newHeight = Math.floor(img.height * ratio);
@@ -331,7 +331,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
           <div className="flex items-center space-x-6 text-sm text-gray-500">
             <span>Supports JPG, PNG, TIFF</span>
             <span>•</span>
-            <span>Max 50MB per file</span>
+            <span>Max {Math.round(CONFIG.IMAGE.MAX_FILE_SIZE / 1024 / 1024)}MB per file</span>
             <span>•</span>
             <span>Batch processing</span>
           </div>
@@ -537,7 +537,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <h4 className="font-medium text-green-900 mb-2">File Requirements</h4>
               <ul className="text-green-700 space-y-1">
-                <li>• Maximum: 50MB per file</li>
+                <li>• Maximum: {Math.round(CONFIG.IMAGE.MAX_FILE_SIZE / 1024 / 1024)}MB per file</li>
                 <li>• Minimum: 10KB (prevents corruption)</li>
                 <li>• Batch: Unlimited files</li>
               </ul>

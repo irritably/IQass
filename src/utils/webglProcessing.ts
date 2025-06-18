@@ -5,6 +5,8 @@
  * with context pooling, performance benchmarking, and precision optimization.
  */
 
+import { CONFIG } from '../config';
+
 interface WebGLContext {
   gl: WebGLRenderingContext | WebGL2RenderingContext;
   canvas: HTMLCanvasElement;
@@ -34,12 +36,11 @@ interface WebGLCapabilities {
 
 // Global context pool
 const contextPool: WebGLContext[] = [];
-const MAX_POOL_SIZE = 3;
-const CONTEXT_TIMEOUT = 30000; // 30 seconds
+const { MAX_POOL_SIZE, CONTEXT_TIMEOUT } = CONFIG.WEBGL;
 
 // Performance tracking
 const performanceBenchmarks: PerformanceBenchmark[] = [];
-const MAX_BENCHMARKS = 100;
+const { MAX_BENCHMARKS } = CONFIG.WEBGL;
 
 /**
  * Vertex shader source code (standard for image processing)
@@ -334,7 +335,7 @@ const getProgram = (
 /**
  * Performance benchmarking utility
  */
-const benchmarkOperation = async <T>(
+export const benchmarkOperation = async <T>(
   operation: string,
   cpuFunction: () => Promise<T> | T,
   gpuFunction: () => Promise<T> | T,
@@ -367,7 +368,7 @@ const benchmarkOperation = async <T>(
   }
 
   // Log in development
-  if (process.env.NODE_ENV === 'development') {
+  if (CONFIG.BENCHMARK.ENABLE_LOGGING) {
     console.log(`Performance Benchmark - ${operation}:`, {
       cpuTime: `${cpuTime.toFixed(2)}ms`,
       gpuTime: `${gpuTime.toFixed(2)}ms`,
@@ -739,8 +740,3 @@ export const cleanupWebGL = () => {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', cleanupWebGL);
 }
-
-/**
- * Export benchmarking utility for external use
- */
-export { benchmarkOperation };

@@ -62,7 +62,7 @@ export const ReportExport: React.FC<ReportExportProps> = ({ analyses, threshold 
           <div>
             <h4 className="font-medium text-gray-900">Export Options</h4>
             <p className="text-sm text-gray-600 mt-1">
-              CSV format includes all analysis data for integration with photogrammetry software. 
+              CSV format includes all analysis data for integration with software. 
               Full report provides detailed recommendations and statistics in text format.
             </p>
           </div>
@@ -89,9 +89,7 @@ SUMMARY STATISTICS
 Total Images: ${report.stats.totalImages}
 Average Blur Score: ${report.stats.averageBlurScore.toFixed(2)}
 Average Composite Score: ${report.stats.averageCompositeScore.toFixed(2)}
-Average Descriptor Score: ${report.stats.averageDescriptorScore.toFixed(2)}
-Average Keypoint Count: ${Math.round(report.stats.averageKeypointCount)}
-Recommended for Reconstruction: ${report.stats.recommendedForReconstruction} (${((report.stats.recommendedForReconstruction / report.stats.totalImages) * 100).toFixed(1)}%)
+Recommended for Use: ${report.stats.recommendedForReconstruction} (${((report.stats.recommendedForReconstruction / report.stats.totalImages) * 100).toFixed(1)}%)
 
 QUALITY DISTRIBUTION
 ===================
@@ -104,15 +102,15 @@ Unsuitable (0-39): ${report.stats.unsuitableCount}
 DETAILED RESULTS
 ===============
 ${report.recommendations.map((r: any) => 
-  `${r.filename}: Composite ${r.compositeScore} | Blur ${r.blurScore} | Descriptor ${r.descriptorScore} | Keypoints ${r.keypointCount} (${r.quality}) - ${r.recommended ? 'RECOMMENDED' : 'NOT RECOMMENDED'}`
+  `${r.filename}: Composite ${r.compositeScore} | Blur ${r.blurScore} | Exposure ${r.exposureScore} | Noise ${r.noiseScore} (${r.quality}) - ${r.recommended ? 'RECOMMENDED' : 'NOT RECOMMENDED'}`
 ).join('\n')}
 
 RECOMMENDATIONS
 ==============
-- Use images with composite scores ≥ ${threshold} for photogrammetry reconstruction
+- Use images with composite scores ≥ ${threshold} for your applications
 - Consider retaking images with scores below ${threshold}
 - For high-precision work, consider using only images with scores ≥ 70
 - Review images flagged as "poor" or "unsuitable" for potential issues
-- Pay attention to descriptor scores and keypoint counts for feature matching quality
+- Pay attention to exposure and noise scores for overall image quality
     `;
 };

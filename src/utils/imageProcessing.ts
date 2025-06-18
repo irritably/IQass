@@ -7,13 +7,15 @@
  * - Image data manipulation
  */
 
+import { CONFIG } from '../config';
+
 /**
  * Creates a thumbnail from an image file
  * @param file - The image file to create a thumbnail from
- * @param maxSize - Maximum size for the thumbnail (default: 150px)
+ * @param maxSize - Maximum size for the thumbnail (default from config)
  * @returns Promise resolving to a data URL of the thumbnail
  */
-export const createThumbnail = (file: File, maxSize: number = 150): Promise<string> => {
+export const createThumbnail = (file: File, maxSize: number = CONFIG.IMAGE.THUMBNAIL_SIZE): Promise<string> => {
   return new Promise((resolve, reject) => {
     // Validate file type first
     if (!file.type.startsWith('image/')) {
@@ -110,10 +112,10 @@ export const createThumbnail = (file: File, maxSize: number = 150): Promise<stri
 /**
  * Loads an image file and returns canvas context with image data
  * @param file - The image file to load
- * @param maxSize - Maximum size for analysis (default: 800px)
+ * @param maxSize - Maximum size for analysis (default from config)
  * @returns Promise resolving to canvas context and image data
  */
-export const loadImageForAnalysis = (file: File, maxSize: number = 800): Promise<{
+export const loadImageForAnalysis = (file: File, maxSize: number = CONFIG.IMAGE.MAX_SIZE_FOR_ANALYSIS): Promise<{
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   imageData: ImageData;
