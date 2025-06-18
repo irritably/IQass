@@ -42,29 +42,77 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
     try {
       const preview = await createThumbnail(file);
       return { file, id, preview };
-    } catch {
+    } catch (err) {
+      console.warn('Failed to create thumbnail for', file.name, err);
       return { file, id, error: 'Failed to create preview' };
     }
   };
 
   const createThumbnail = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // Check if file is actually an image
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('File is not an image'));
+        return;
+      }
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
       
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+
+      // Set up timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        reject(new Error('Thumbnail creation timeout'));
+      }, 10000); // 10 second timeout
+
       img.onload = () => {
-        const size = 80;
-        const ratio = Math.min(size / img.width, size / img.height);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        try {
+          clearTimeout(timeout);
+          
+          const size = 80;
+          const ratio = Math.min(size / img.width, size / img.height);
+          canvas.width = img.width * ratio;
+          canvas.height = img.height * ratio;
+          
+          // Clear canvas and draw image
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          // Convert to data URL with error handling
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            resolve(dataUrl);
+          } catch (canvasError) {
+            reject(new Error('Failed to convert canvas to data URL'));
+          }
+        } catch (drawError) {
+          clearTimeout(timeout);
+          reject(new Error('Failed to draw image on canvas'));
+        } finally {
+          // Clean up object URL
+          URL.revokeObjectURL(img.src);
+        }
       };
       
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
+      img.onerror = (err) => {
+        clearTimeout(timeout);
+        URL.revokeObjectURL(img.src);
+        reject(new Error('Failed to load image for thumbnail'));
+      };
+
+      // Create object URL and load image
+      try {
+        const objectUrl = URL.createObjectURL(file);
+        img.src = objectUrl;
+      } catch (urlError) {
+        clearTimeout(timeout);
+        reject(new Error('Failed to create object URL'));
+      }
     });
   };
 
@@ -268,6 +316,18 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                       src={filePreview.preview}
                       alt={filePreview.file.name}
                       className="w-full h-full object-cover rounded"
+                      onError={(e) => {
+                        // Handle image load errors gracefully
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement('div');
+                          fallback.className = 'w-full h-full bg-gray-200 rounded flex items-center justify-center';
+                          fallback.innerHTML = '<svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+                          parent.appendChild(fallback);
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full bg-gray-200 rounded flex items-center justify-center">
