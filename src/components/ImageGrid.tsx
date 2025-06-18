@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ImageAnalysis } from '../types';
-import { CheckCircle, AlertTriangle, XCircle, Eye, Download, Info, ArrowLeftRight } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Eye, Download, Info, ArrowLeftRight, Grid, List, Filter, SortAsc } from 'lucide-react';
 import { TechnicalQualityPanel } from './TechnicalQualityPanel';
 import { VirtualizedImageGrid } from './VirtualizedImageGrid';
 import { ImageComparisonModal } from './ImageComparisonModal';
@@ -11,6 +11,8 @@ interface ImageGridProps {
   analyses: ImageAnalysis[];
   threshold: number;
 }
+
+type ViewMode = 'list' | 'grid';
 
 export const ImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) => {
   // For large batches (>50 images), use the virtualized grid with lazy loading
@@ -31,6 +33,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) => 
 const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) => {
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('composite');
+  const [viewMode, setViewMode] = useState<ViewMode>('list'); // Default to list view
   const [selectedImage, setSelectedImage] = useState<ImageAnalysis | null>(null);
   const [selectedForComparison, setSelectedForComparison] = useState<ImageAnalysis[]>([]);
   const [showComparison, setShowComparison] = useState(false);
@@ -92,8 +95,26 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
    */
   const handleDownloadRecommended = useCallback(() => {
     const recommended = analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold);
-    console.log('Would download', recommended.length, 'recommended images');
-    // TODO: Implement actual download functionality
+    
+    // Create a simple text file with recommended image names
+    const content = [
+      'Recommended Images for Photogrammetric Reconstruction',
+      `Generated: ${new Date().toLocaleString()}`,
+      `Threshold: ${threshold}`,
+      `Total Images: ${analyses.length}`,
+      `Recommended: ${recommended.length}`,
+      '',
+      'Recommended Files:',
+      ...recommended.map(img => `${img.name} (Score: ${img.compositeScore?.overall || 0})`)
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `recommended_images_${new Date().toISOString().split('T')[0]}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
   }, [analyses, threshold]);
 
   /**
@@ -144,6 +165,32 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
               </div>
               
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <List className="w-4 h-4 mr-2" />
+                    List
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Grid className="w-4 h-4 mr-2" />
+                    Grid
+                  </button>
+                </div>
+
                 {/* Enhanced Filter Dropdown */}
                 <select
                   value={filter}
@@ -215,22 +262,34 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
           </div>
         </div>
 
-        {/* Enhanced Image Grid */}
+        {/* Enhanced Image Display */}
         <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAnalyses.map((analysis) => (
-              <ImageCard
-                key={analysis.id}
-                analysis={analysis}
-                threshold={threshold}
-                onSelect={setSelectedImage}
-                getQualityIcon={getQualityIcon}
-                isSelectedForComparison={selectedForComparison.some(img => img.id === analysis.id)}
-                onToggleComparison={toggleImageForComparison}
-                comparisonDisabled={selectedForComparison.length >= 3 && !selectedForComparison.some(img => img.id === analysis.id)}
-              />
-            ))}
-          </div>
+          {viewMode === 'list' ? (
+            <ListView
+              analyses={filteredAnalyses}
+              threshold={threshold}
+              onSelect={setSelectedImage}
+              getQualityIcon={getQualityIcon}
+              selectedForComparison={selectedForComparison}
+              onToggleComparison={toggleImageForComparison}
+              comparisonDisabled={(analysis) => selectedForComparison.length >= 3 && !selectedForComparison.some(img => img.id === analysis.id)}
+            />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredAnalyses.map((analysis) => (
+                <ImageCard
+                  key={analysis.id}
+                  analysis={analysis}
+                  threshold={threshold}
+                  onSelect={setSelectedImage}
+                  getQualityIcon={getQualityIcon}
+                  isSelectedForComparison={selectedForComparison.some(img => img.id === analysis.id)}
+                  onToggleComparison={toggleImageForComparison}
+                  comparisonDisabled={selectedForComparison.length >= 3 && !selectedForComparison.some(img => img.id === analysis.id)}
+                />
+              ))}
+            </div>
+          )}
           
           {/* Enhanced Empty State */}
           {filteredAnalyses.length === 0 && (
@@ -275,6 +334,161 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
         </div>
       )}
     </>
+  );
+};
+
+/**
+ * List View Component
+ */
+interface ListViewProps {
+  analyses: ImageAnalysis[];
+  threshold: number;
+  onSelect: (analysis: ImageAnalysis) => void;
+  getQualityIcon: (recommendation: string) => React.ReactNode;
+  selectedForComparison: ImageAnalysis[];
+  onToggleComparison: (analysis: ImageAnalysis) => void;
+  comparisonDisabled: (analysis: ImageAnalysis) => boolean;
+}
+
+const ListView: React.FC<ListViewProps> = ({
+  analyses,
+  threshold,
+  onSelect,
+  getQualityIcon,
+  selectedForComparison,
+  onToggleComparison,
+  comparisonDisabled
+}) => {
+  return (
+    <div className="space-y-2">
+      {/* Header */}
+      <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 rounded-lg text-sm font-medium text-gray-700 border border-gray-200">
+        <div className="col-span-1 text-center">Select</div>
+        <div className="col-span-3">Image Name</div>
+        <div className="col-span-1 text-center">Overall</div>
+        <div className="col-span-1 text-center">Blur</div>
+        <div className="col-span-1 text-center">Exposure</div>
+        <div className="col-span-1 text-center">Noise</div>
+        <div className="col-span-1 text-center">Features</div>
+        <div className="col-span-2 text-center">Quality</div>
+        <div className="col-span-1 text-center">Actions</div>
+      </div>
+
+      {/* List Items */}
+      {analyses.map((analysis) => {
+        const isRecommended = (analysis.compositeScore?.overall || 0) >= threshold;
+        const recommendation = analysis.compositeScore?.recommendation || 'unsuitable';
+        const isSelected = selectedForComparison.some(img => img.id === analysis.id);
+        const disabled = comparisonDisabled(analysis);
+
+        return (
+          <div
+            key={analysis.id}
+            className={`grid grid-cols-12 gap-4 px-4 py-3 bg-white rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer ${
+              isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+            }`}
+            onClick={() => onSelect(analysis)}
+          >
+            {/* Selection Checkbox */}
+            <div className="col-span-1 flex justify-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!disabled) {
+                    onToggleComparison(analysis);
+                  }
+                }}
+                disabled={disabled}
+                className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                  isSelected
+                    ? 'bg-blue-600 border-blue-600 text-white'
+                    : disabled
+                    ? 'bg-gray-200 border-gray-300 cursor-not-allowed'
+                    : 'bg-white border-gray-300 hover:border-blue-500'
+                }`}
+              >
+                {isSelected && <CheckCircle className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Image Name */}
+            <div className="col-span-3 flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                {analysis.thumbnail ? (
+                  <img
+                    src={analysis.thumbnail}
+                    alt={analysis.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Eye className="w-4 h-4 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-900 truncate">{analysis.name}</p>
+                <p className="text-xs text-gray-500">{(analysis.size / 1024 / 1024).toFixed(1)} MB</p>
+              </div>
+            </div>
+
+            {/* Scores */}
+            <div className="col-span-1 flex items-center justify-center">
+              <span className={`text-sm font-semibold ${
+                (analysis.compositeScore?.overall || 0) >= 85 ? 'text-green-600' :
+                (analysis.compositeScore?.overall || 0) >= 70 ? 'text-blue-600' :
+                (analysis.compositeScore?.overall || 0) >= 55 ? 'text-yellow-600' :
+                (analysis.compositeScore?.overall || 0) >= 40 ? 'text-orange-600' : 'text-red-600'
+              }`}>
+                {analysis.compositeScore?.overall || 0}
+              </span>
+            </div>
+
+            <div className="col-span-1 flex items-center justify-center">
+              <span className="text-sm text-gray-700">{analysis.blurScore}</span>
+            </div>
+
+            <div className="col-span-1 flex items-center justify-center">
+              <span className="text-sm text-gray-700">{analysis.exposureAnalysis?.exposureScore || 0}</span>
+            </div>
+
+            <div className="col-span-1 flex items-center justify-center">
+              <span className="text-sm text-gray-700">{analysis.noiseAnalysis?.noiseScore || 0}</span>
+            </div>
+
+            <div className="col-span-1 flex items-center justify-center">
+              <span className="text-sm text-gray-700">{analysis.descriptorAnalysis?.keypointCount || 0}</span>
+            </div>
+
+            {/* Quality Badge */}
+            <div className="col-span-2 flex items-center justify-center">
+              <div className="flex items-center space-x-2">
+                {getQualityIcon(recommendation)}
+                <span className={`text-sm font-medium ${
+                  isRecommended ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {isRecommended ? 'Recommended' : 'Not Recommended'}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="col-span-1 flex items-center justify-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(analysis);
+                }}
+                className="text-blue-600 hover:text-blue-700 transition-colors p-1 rounded hover:bg-blue-50"
+                title="View details"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 };
 

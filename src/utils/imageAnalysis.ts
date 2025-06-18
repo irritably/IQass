@@ -11,7 +11,7 @@ import { loadImageForAnalysis, createThumbnail, calculateBlurScore } from './ima
 import { analyzeEnhancedExposure } from './enhancedExposureAnalysis';
 import { analyzeNoise } from './noiseAnalysis';
 import { extractMetadata, calculateTechnicalScore } from './metadataExtraction';
-import { calculateCompositeScore } from './compositeScoring';
+import { calculateCompositeScore, validateQualityConsistency } from './compositeScoring';
 import { analyzeDescriptors } from './descriptorAnalysis';
 import { getQualityLevel, generateQualityReport, exportQualityDataToCSV } from './qualityAssessment';
 
@@ -110,16 +110,20 @@ export const analyzeImage = async (file: File): Promise<ImageAnalysis> => {
     
     // Step 5: Calculate derived metrics
     const technicalScore = calculateTechnicalScore(metadata);
-    const compositeScore = calculateCompositeScore(
+    let compositeScore = calculateCompositeScore(
       blurScore,
       exposureAnalysis.exposureScore,
       noiseAnalysis.noiseScore,
       technicalScore,
       descriptorAnalysis.photogrammetricScore
     );
+    
+    // Step 6: Validate consistency between overall and photogrammetric assessments
+    compositeScore = validateQualityConsistency(compositeScore, descriptorAnalysis.photogrammetricScore);
+    
     const quality = getQualityLevel(compositeScore.overall);
     
-    console.log(`Completed analysis for ${file.name} with composite score: ${compositeScore.overall}`);
+    console.log(`Completed analysis for ${file.name} with composite score: ${compositeScore.overall}, recommendation: ${compositeScore.recommendation}`);
     
     return {
       id: analysisId,

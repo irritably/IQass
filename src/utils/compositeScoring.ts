@@ -24,13 +24,24 @@ export const calculateCompositeScore = (
     descriptorScore * weights.descriptor
   );
   
-  // Determine recommendation based on composite score with enhanced thresholds
+  // Enhanced recommendation logic that considers both overall score AND photogrammetric suitability
   let recommendation: CompositeQualityScore['recommendation'];
-  if (overall >= 85) recommendation = 'excellent';
-  else if (overall >= 70) recommendation = 'good';
-  else if (overall >= 55) recommendation = 'acceptable';
-  else if (overall >= 40) recommendation = 'poor';
-  else recommendation = 'unsuitable';
+  
+  // If descriptor score is very low (< 30), it should significantly impact the recommendation
+  if (descriptorScore < 30 && descriptorScore > 0) {
+    // Poor feature quality should downgrade recommendation
+    if (overall >= 85) recommendation = 'good'; // Downgrade from excellent
+    else if (overall >= 70) recommendation = 'acceptable'; // Downgrade from good
+    else if (overall >= 55) recommendation = 'poor'; // Downgrade from acceptable
+    else recommendation = 'unsuitable';
+  } else {
+    // Standard scoring when features are adequate or not analyzed
+    if (overall >= 85) recommendation = 'excellent';
+    else if (overall >= 70) recommendation = 'good';
+    else if (overall >= 55) recommendation = 'acceptable';
+    else if (overall >= 40) recommendation = 'poor';
+    else recommendation = 'unsuitable';
+  }
   
   return {
     blur: blurScore,
@@ -89,4 +100,23 @@ export const calculatePhotogrammetricSuitability = (
     exposureScore * photogrammetricWeights.exposure +
     noiseScore * photogrammetricWeights.noise
   );
+};
+
+// Helper function to ensure consistency between overall and photogrammetric assessments
+export const validateQualityConsistency = (
+  compositeScore: CompositeQualityScore,
+  photogrammetricScore: number
+): CompositeQualityScore => {
+  // If there's a significant mismatch, adjust the overall recommendation
+  const scoreDifference = Math.abs(compositeScore.overall - photogrammetricScore);
+  
+  if (scoreDifference > 30 && photogrammetricScore < 40) {
+    // If photogrammetric score is much lower, downgrade recommendation
+    return {
+      ...compositeScore,
+      recommendation: photogrammetricScore < 30 ? 'unsuitable' : 'poor'
+    };
+  }
+  
+  return compositeScore;
 };
