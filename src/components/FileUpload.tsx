@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useRef } from 'react';
-import { Upload, Image as ImageIcon, AlertCircle, X, FolderOpen, FileImage, Tag, Check, AlertTriangle } from 'lucide-react';
+import { Upload, Image as ImageIcon, AlertCircle, X, FolderOpen, FileImage, Tag, Check, AlertTriangle, Info } from 'lucide-react';
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -260,26 +260,26 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      {/* Main Drop Zone */}
+      {/* Enhanced Main Drop Zone */}
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`border-2 border-dashed rounded-lg transition-all duration-200 ${
+        className={`border-2 border-dashed rounded-xl transition-all duration-300 ${
           isProcessing 
             ? 'border-gray-200 bg-gray-50' 
             : isDragOver
-            ? 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg'
+            ? 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg ring-2 ring-blue-200'
             : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
         } ${selectedFiles.length === 0 ? 'p-16' : 'p-8'}`}
       >
         <div className="flex flex-col items-center space-y-4">
-          <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
             isProcessing 
               ? 'bg-gray-100' 
               : isDragOver
-              ? 'bg-blue-200 scale-110'
-              : 'bg-blue-100'
+              ? 'bg-blue-200 scale-110 shadow-lg'
+              : 'bg-blue-100 shadow-md'
           }`}>
             {isProcessing ? (
               <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -289,7 +289,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
           </div>
           
           <div className="space-y-2 text-center">
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-xl font-bold text-gray-900">
               {isProcessing 
                 ? 'Processing Images...' 
                 : selectedFiles.length > 0
@@ -297,7 +297,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                 : 'Upload Drone Photos'
               }
             </h3>
-            <p className="text-gray-600 max-w-md">
+            <p className="text-gray-600 max-w-md leading-relaxed">
               {isProcessing 
                 ? 'Please wait while we analyze your images for quality assessment'
                 : selectedFiles.length > 0
@@ -320,7 +320,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
               />
               <label
                 htmlFor="file-upload"
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-md hover:shadow-lg"
               >
                 <FolderOpen className="w-5 h-5 mr-2" />
                 Browse Files
@@ -329,41 +329,41 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
           )}
 
           <div className="flex items-center space-x-6 text-sm text-gray-500">
-            <span>Supports JPG, PNG, TIFF</span>
+            <span className="font-medium">Supports JPG, PNG, TIFF</span>
             <span>•</span>
-            <span>Max 50MB per file</span>
+            <span className="font-medium">Max 50MB per file</span>
             <span>•</span>
-            <span>Batch processing</span>
+            <span className="font-medium">Batch processing</span>
           </div>
         </div>
       </div>
 
-      {/* File Preview Grid */}
+      {/* Enhanced File Preview Grid */}
       {selectedFiles.length > 0 && (
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              <h4 className="font-medium text-gray-900">
+              <h4 className="text-lg font-bold text-gray-900">
                 Selected Files ({selectedFiles.length})
               </h4>
               {validFileCount > 0 && (
-                <span className="inline-flex items-center text-sm text-green-600">
+                <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full border border-green-200">
                   <Check className="w-4 h-4 mr-1" />
                   {validFileCount} ready to process
                 </span>
               )}
               {errorFileCount > 0 && (
-                <span className="inline-flex items-center text-sm text-red-600">
+                <span className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full border border-red-200">
                   <AlertTriangle className="w-4 h-4 mr-1" />
                   {errorFileCount} with errors
                 </span>
               )}
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               {validFileCount > 0 && !isProcessing && (
                 <button
                   onClick={startProcessing}
-                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  className="inline-flex items-center px-6 py-3 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-md hover:shadow-lg"
                 >
                   <ImageIcon className="w-4 h-4 mr-2" />
                   Start Analysis ({validFileCount})
@@ -372,28 +372,28 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
               <button
                 onClick={clearAllFiles}
                 disabled={isProcessing}
-                className="inline-flex items-center px-3 py-2 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                className="inline-flex items-center px-4 py-2 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 border border-gray-300"
               >
                 Clear All
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-h-96 overflow-y-auto">
             {selectedFiles.map((filePreview) => (
               <div
                 key={filePreview.id}
-                className={`relative group border-2 rounded-lg p-3 transition-all duration-200 ${
+                className={`relative group border-2 rounded-xl p-4 transition-all duration-200 ${
                   filePreview.error 
                     ? 'border-red-300 bg-red-50 shadow-sm' 
-                    : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:shadow-md'
+                    : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:shadow-lg'
                 }`}
               >
                 {/* Enhanced Error Display */}
                 {filePreview.error && (
                   <div className="absolute -top-2 -right-2 z-10">
-                    <div className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center">
-                      <AlertTriangle className="w-3 h-3" />
+                    <div className="w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md">
+                      <AlertTriangle className="w-4 h-4" />
                     </div>
                   </div>
                 )}
@@ -403,40 +403,39 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                     <img
                       src={filePreview.preview}
                       alt={filePreview.file.name}
-                      className="w-full h-full object-cover rounded"
+                      className="w-full h-full object-cover rounded-lg"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 rounded flex items-center justify-center">
-                      <FileImage className={`w-6 h-6 ${filePreview.error ? 'text-red-400' : 'text-gray-400'}`} />
+                    <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
+                      <FileImage className={`w-8 h-8 ${filePreview.error ? 'text-red-400' : 'text-gray-400'}`} />
                     </div>
                   )}
                   
                   {!isProcessing && (
                     <button
                       onClick={() => removeFile(filePreview.id)}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
                 
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-gray-900 truncate" title={filePreview.file.name}>
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-gray-900 truncate" title={filePreview.file.name}>
                     {filePreview.file.name}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 font-medium">
                     {(filePreview.file.size / 1024 / 1024).toFixed(1)} MB
                   </p>
                   
                   {/* Enhanced Error Information */}
                   {filePreview.error && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-red-600 font-medium">
+                    <div className="space-y-2 p-3 bg-red-100 border border-red-200 rounded-lg">
+                      <p className="text-xs text-red-700 font-semibold">
                         {filePreview.error}
                       </p>
-                      {/* Add suggestion based on error type */}
-                      <p className="text-xs text-red-500">
+                      <p className="text-xs text-red-600">
                         {filePreview.error.includes('format') && 'Use JPG, PNG, or TIFF format'}
                         {filePreview.error.includes('large') && 'Compress image or use different format'}
                         {filePreview.error.includes('small') && 'Check if file is corrupted'}
@@ -445,20 +444,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                     </div>
                   )}
 
-                  {/* Tags Section */}
+                  {/* Enhanced Tags Section */}
                   {!filePreview.error && (
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       {filePreview.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1">
                           {filePreview.tags.map((tag, index) => (
                             <span
                               key={index}
-                              className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                              className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full border border-blue-200"
                             >
                               {tag}
                               <button
                                 onClick={() => removeTag(filePreview.id, index)}
-                                className="ml-1 hover:text-blue-600"
+                                className="ml-1 hover:text-blue-600 transition-colors"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -479,12 +478,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                               }
                             }}
                             placeholder="Add tag..."
-                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             autoFocus
                           />
                           <button
                             onClick={() => addTag(filePreview.id, newTag)}
-                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
                           >
                             <Check className="w-3 h-3" />
                           </button>
@@ -492,7 +491,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                       ) : (
                         <button
                           onClick={() => setShowTagInput(filePreview.id)}
-                          className="inline-flex items-center text-xs text-blue-600 hover:text-blue-700"
+                          className="inline-flex items-center text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
                         >
                           <Tag className="w-3 h-3 mr-1" />
                           Add tag
@@ -509,11 +508,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
 
       {/* Enhanced Help Text */}
       {selectedFiles.length === 0 && !isProcessing && (
-        <div className="mt-6 space-y-4">
-          <div className="flex items-start space-x-2 text-sm text-amber-600 bg-amber-50 p-4 rounded-lg border border-amber-200">
+        <div className="mt-8 space-y-6">
+          <div className="flex items-start space-x-3 text-sm text-amber-700 bg-amber-50 p-4 rounded-lg border border-amber-200">
             <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-medium mb-2">Tips for Best Results:</p>
+              <p className="font-semibold mb-2">Tips for Best Results:</p>
               <ul className="space-y-1 text-sm">
                 <li>• Upload high-resolution drone photos for accurate analysis</li>
                 <li>• Ensure images are properly exposed and in focus</li>
@@ -526,7 +525,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="font-medium text-blue-900 mb-2">Supported Formats</h4>
+              <div className="flex items-center mb-2">
+                <Info className="w-4 h-4 text-blue-600 mr-2" />
+                <h4 className="font-semibold text-blue-900">Supported Formats</h4>
+              </div>
               <ul className="text-blue-700 space-y-1">
                 <li>• JPEG/JPG (most common)</li>
                 <li>• PNG (lossless)</li>
@@ -535,7 +537,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
             </div>
             
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="font-medium text-green-900 mb-2">File Requirements</h4>
+              <div className="flex items-center mb-2">
+                <Check className="w-4 h-4 text-green-600 mr-2" />
+                <h4 className="font-semibold text-green-900">File Requirements</h4>
+              </div>
               <ul className="text-green-700 space-y-1">
                 <li>• Maximum: 50MB per file</li>
                 <li>• Minimum: 10KB (prevents corruption)</li>
@@ -544,7 +549,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
             </div>
             
             <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <h4 className="font-medium text-purple-900 mb-2">Organization</h4>
+              <div className="flex items-center mb-2">
+                <Tag className="w-4 h-4 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-purple-900">Organization</h4>
+              </div>
               <ul className="text-purple-700 space-y-1">
                 <li>• Add custom tags</li>
                 <li>• Group by flight/area</li>

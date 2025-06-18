@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ImageAnalysis } from '../types';
 import { CheckCircle, AlertTriangle, XCircle, Eye, Download, Info, ArrowLeftRight } from 'lucide-react';
 import { TechnicalQualityPanel } from './TechnicalQualityPanel';
@@ -34,6 +34,7 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
   const [selectedImage, setSelectedImage] = useState<ImageAnalysis | null>(null);
   const [selectedForComparison, setSelectedForComparison] = useState<ImageAnalysis[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const { filteredAnalyses, filterCounts } = useImageFiltering({
     analyses,
@@ -42,10 +43,34 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
     threshold
   });
 
+  // Enhanced keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (showComparison) {
+          setShowComparison(false);
+        } else if (selectedImage) {
+          setSelectedImage(null);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showComparison, selectedImage]);
+
+  // Focus management for modals
+  useEffect(() => {
+    if ((selectedImage || showComparison) && modalRef.current) {
+      const firstFocusable = modalRef.current.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') as HTMLElement;
+      firstFocusable?.focus();
+    }
+  }, [selectedImage, showComparison]);
+
   /**
    * Returns appropriate icon for quality recommendation
    */
-  const getQualityIcon = (recommendation: string) => {
+  const getQualityIcon = useCallback((recommendation: string) => {
     switch (recommendation) {
       case 'excellent':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
@@ -60,21 +85,21 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
       default:
         return <XCircle className="w-5 h-5 text-gray-600" />;
     }
-  };
+  }, []);
 
   /**
    * Handles downloading recommended images
    */
-  const handleDownloadRecommended = () => {
+  const handleDownloadRecommended = useCallback(() => {
     const recommended = analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold);
     console.log('Would download', recommended.length, 'recommended images');
     // TODO: Implement actual download functionality
-  };
+  }, [analyses, threshold]);
 
   /**
    * Handles image selection for comparison
    */
-  const toggleImageForComparison = (analysis: ImageAnalysis) => {
+  const toggleImageForComparison = useCallback((analysis: ImageAnalysis) => {
     setSelectedForComparison(prev => {
       const isSelected = prev.some(img => img.id === analysis.id);
       if (isSelected) {
@@ -84,52 +109,57 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
       }
       return prev;
     });
-  };
+  }, []);
 
   /**
    * Opens comparison modal
    */
-  const openComparison = () => {
+  const openComparison = useCallback(() => {
     if (selectedForComparison.length >= 2) {
       setShowComparison(true);
     }
-  };
+  }, [selectedForComparison.length]);
 
   /**
    * Clears comparison selection
    */
-  const clearComparison = () => {
+  const clearComparison = useCallback(() => {
     setSelectedForComparison([]);
-  };
+  }, []);
 
   if (analyses.length === 0) return null;
 
   return (
     <>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        {/* Header with Controls */}
-        <div className="p-6 border-b border-gray-200">
+        {/* Enhanced Header with Controls */}
+        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
           <div className="flex flex-col space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-              <h3 className="text-lg font-semibold text-gray-900">Image Analysis Results</h3>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Image Analysis Results</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {filteredAnalyses.length} of {analyses.length} images shown
+                </p>
+              </div>
               
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-                {/* Filter Dropdown */}
+                {/* Enhanced Filter Dropdown */}
                 <select
                   value={filter}
                   onChange={(e) => setFilter(e.target.value as FilterType)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
                   <option value="all">All Images ({filterCounts.all})</option>
-                  <option value="recommended">Recommended ({filterCounts.recommended})</option>
-                  <option value="not-recommended">Not Recommended ({filterCounts.notRecommended})</option>
+                  <option value="recommended">✓ Recommended ({filterCounts.recommended})</option>
+                  <option value="not-recommended">✗ Not Recommended ({filterCounts.notRecommended})</option>
                 </select>
                 
-                {/* Sort Dropdown */}
+                {/* Enhanced Sort Dropdown */}
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortType)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
                   <option value="composite">Sort by Composite Score</option>
                   <option value="score">Sort by Blur Score</option>
@@ -137,10 +167,10 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
                   <option value="quality">Sort by Quality</option>
                 </select>
                 
-                {/* Download Button */}
+                {/* Enhanced Download Button */}
                 <button
                   onClick={handleDownloadRecommended}
-                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm hover:shadow-md"
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Export Recommended
@@ -148,24 +178,29 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
               </div>
             </div>
 
-            {/* Comparison Controls */}
+            {/* Enhanced Comparison Controls */}
             {selectedForComparison.length > 0 && (
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 shadow-sm">
                 <div className="flex items-center space-x-3">
-                  <ArrowLeftRight className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-900">
-                    {selectedForComparison.length} image{selectedForComparison.length !== 1 ? 's' : ''} selected for comparison
-                  </span>
-                  <span className="text-xs text-blue-700">
-                    (Select 2-3 images to compare)
-                  </span>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <ArrowLeftRight className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold text-blue-900">
+                      {selectedForComparison.length} image{selectedForComparison.length !== 1 ? 's' : ''} selected for comparison
+                    </span>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Select 2-3 images to compare quality metrics and technical details
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
                   <button
                     onClick={openComparison}
                     disabled={selectedForComparison.length < 2}
-                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                   >
+                    <ArrowLeftRight className="w-4 h-4 mr-2" />
                     Compare Images
                   </button>
                   <button
@@ -180,7 +215,7 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
           </div>
         </div>
 
-        {/* Image Grid */}
+        {/* Enhanced Image Grid */}
         <div className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredAnalyses.map((analysis) => (
@@ -197,37 +232,54 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
             ))}
           </div>
           
-          {/* Empty State */}
+          {/* Enhanced Empty State */}
           {filteredAnalyses.length === 0 && (
-            <div className="text-center py-12">
-              <Eye className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No images match the current filter.</p>
+            <div className="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Eye className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No images match the current filter</h3>
+              <p className="text-gray-600 max-w-md mx-auto">
+                Try adjusting your filter settings or threshold to see more results.
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Technical Quality Modal */}
+      {/* Enhanced Technical Quality Modal */}
       {selectedImage && (
-        <TechnicalQualityModal
-          analysis={selectedImage}
-          onClose={() => setSelectedImage(null)}
-        />
+        <div 
+          ref={modalRef}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={(e) => e.target === e.currentTarget && setSelectedImage(null)}
+        >
+          <TechnicalQualityModal
+            analysis={selectedImage}
+            onClose={() => setSelectedImage(null)}
+          />
+        </div>
       )}
 
-      {/* Image Comparison Modal */}
+      {/* Enhanced Image Comparison Modal */}
       {showComparison && (
-        <ImageComparisonModal
-          images={selectedForComparison}
-          onClose={() => setShowComparison(false)}
-        />
+        <div 
+          ref={modalRef}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={(e) => e.target === e.currentTarget && setShowComparison(false)}
+        >
+          <ImageComparisonModal
+            images={selectedForComparison}
+            onClose={() => setShowComparison(false)}
+          />
+        </div>
       )}
     </>
   );
 };
 
 /**
- * Individual Image Card Component
+ * Enhanced Individual Image Card Component
  */
 interface ImageCardProps {
   analysis: ImageAnalysis;
@@ -253,13 +305,15 @@ const ImageCard: React.FC<ImageCardProps> = ({
 
   return (
     <div
-      className={`group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer ${
-        isSelectedForComparison ? 'ring-2 ring-blue-500 shadow-lg' : ''
+      className={`group relative bg-white rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer ${
+        isSelectedForComparison 
+          ? 'border-blue-500 shadow-lg ring-2 ring-blue-200' 
+          : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
       }`}
       onClick={() => onSelect(analysis)}
     >
-      {/* Comparison Selection Checkbox */}
-      <div className="absolute top-2 left-2 z-10">
+      {/* Enhanced Comparison Selection Checkbox */}
+      <div className="absolute top-3 left-3 z-10">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -268,20 +322,21 @@ const ImageCard: React.FC<ImageCardProps> = ({
             }
           }}
           disabled={comparisonDisabled}
-          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+          className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
             isSelectedForComparison
-              ? 'bg-blue-600 border-blue-600 text-white'
+              ? 'bg-blue-600 border-blue-600 text-white shadow-md'
               : comparisonDisabled
-              ? 'bg-gray-200 border-gray-300 cursor-not-allowed'
-              : 'bg-white border-gray-300 hover:border-blue-500'
+              ? 'bg-gray-200 border-gray-300 cursor-not-allowed opacity-50'
+              : 'bg-white border-gray-300 hover:border-blue-500 hover:bg-blue-50 shadow-sm'
           }`}
+          title={comparisonDisabled ? 'Maximum 3 images for comparison' : 'Select for comparison'}
         >
           {isSelectedForComparison && <CheckCircle className="w-4 h-4" />}
         </button>
       </div>
 
-      {/* Image Thumbnail */}
-      <div className="aspect-square relative">
+      {/* Enhanced Image Thumbnail */}
+      <div className="aspect-square relative bg-gray-100">
         {analysis.thumbnail ? (
           <img
             src={analysis.thumbnail}
@@ -289,49 +344,51 @@ const ImageCard: React.FC<ImageCardProps> = ({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center">
             <Eye className="w-8 h-8 text-gray-400" />
           </div>
         )}
         
-        {/* Quality Icon Overlay */}
-        <div className="absolute top-2 right-2">
-          {getQualityIcon(recommendation)}
+        {/* Enhanced Quality Icon Overlay */}
+        <div className="absolute top-3 right-3">
+          <div className="p-1 bg-white rounded-full shadow-md">
+            {getQualityIcon(recommendation)}
+          </div>
         </div>
         
-        {/* Score Overlays */}
+        {/* Enhanced Score Overlays */}
         <div className="absolute bottom-2 left-2 right-2 space-y-1">
-          <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs font-medium">
+          <div className="bg-black bg-opacity-80 text-white px-3 py-1 rounded-lg text-sm font-semibold backdrop-blur-sm">
             Overall: {analysis.compositeScore?.overall || 0}
           </div>
-          <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+          <div className="bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs backdrop-blur-sm">
             Blur: {analysis.blurScore} | Exp: {analysis.exposureAnalysis?.exposureScore || 0} | Noise: {analysis.noiseAnalysis?.noiseScore || 0}
           </div>
         </div>
       </div>
       
-      {/* Card Content */}
-      <div className="p-4">
-        <h4 className="font-medium text-gray-900 truncate mb-2">
+      {/* Enhanced Card Content */}
+      <div className="p-4 space-y-3">
+        <h4 className="font-semibold text-gray-900 truncate text-base">
           {analysis.name}
         </h4>
         
-        <div className="flex items-center justify-between mb-2">
-          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+        <div className="flex items-center justify-between">
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
             getRecommendationColor(recommendation)
           }`}>
             {recommendation}
           </span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 font-medium">
             {(analysis.size / 1024 / 1024).toFixed(1)} MB
           </span>
         </div>
         
-        <div className="flex items-center justify-between">
-          <span className={`text-sm font-medium ${
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <span className={`text-sm font-semibold ${
             isRecommended ? 'text-green-600' : 'text-red-600'
           }`}>
-            {isRecommended ? 'Recommended' : 'Not Recommended'}
+            {isRecommended ? '✓ Recommended' : '✗ Not Recommended'}
           </span>
           
           <button
@@ -339,16 +396,17 @@ const ImageCard: React.FC<ImageCardProps> = ({
               e.stopPropagation();
               onSelect(analysis);
             }}
-            className="text-blue-600 hover:text-blue-700"
+            className="text-blue-600 hover:text-blue-700 transition-colors p-1 rounded hover:bg-blue-50"
+            title="View technical details"
           >
             <Info className="w-4 h-4" />
           </button>
         </div>
         
-        {/* Error Display */}
+        {/* Enhanced Error Display */}
         {analysis.error && (
-          <div className="mt-2 text-xs text-red-600 truncate">
-            Error: {analysis.error}
+          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+            <strong>Error:</strong> {analysis.error}
           </div>
         )}
       </div>
@@ -357,7 +415,7 @@ const ImageCard: React.FC<ImageCardProps> = ({
 };
 
 /**
- * Technical Quality Modal Component
+ * Enhanced Technical Quality Modal Component
  */
 interface TechnicalQualityModalProps {
   analysis: ImageAnalysis;
@@ -369,20 +427,22 @@ const TechnicalQualityModal: React.FC<TechnicalQualityModalProps> = ({
   onClose 
 }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">{analysis.name}</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
+    <div className="bg-white rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">{analysis.name}</h2>
+          <p className="text-sm text-gray-600 mt-1">Technical Quality Analysis</p>
         </div>
-        <div className="p-6">
-          <TechnicalQualityPanel analysis={analysis} />
-        </div>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
+          title="Close modal (Esc)"
+        >
+          <XCircle className="w-6 h-6" />
+        </button>
+      </div>
+      <div className="p-6">
+        <TechnicalQualityPanel analysis={analysis} />
       </div>
     </div>
   );
