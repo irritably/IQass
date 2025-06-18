@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useRef } from 'react';
-import { Upload, Image, AlertCircle, X, FolderOpen, FileImage } from 'lucide-react';
+import { Upload, Image as ImageIcon, AlertCircle, X, FolderOpen, FileImage } from 'lucide-react';
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -315,7 +315,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                   onClick={startProcessing}
                   className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  <Image className="w-4 h-4 mr-2" />
+                  <ImageIcon className="w-4 h-4 mr-2" />
                   Start Analysis ({validFileCount})
                 </button>
               )}
