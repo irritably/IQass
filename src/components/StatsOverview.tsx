@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnalysisStats } from '../types';
-import { CheckCircle, AlertTriangle, XCircle, TrendingUp, Camera, Zap, Target, Grid } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, TrendingUp, Camera, Zap, Grid } from 'lucide-react';
 
 interface StatsOverviewProps {
   stats: AnalysisStats;
@@ -115,12 +115,12 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ stats, threshold }
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Average Descriptor Score</p>
-            <p className="text-3xl font-bold text-cyan-600">{stats.averageDescriptorScore?.toFixed(1) || '0.0'}</p>
-            <p className="text-sm text-gray-500">Feature quality</p>
+            <p className="text-sm font-medium text-gray-600">Average Noise Score</p>
+            <p className="text-3xl font-bold text-cyan-600">{stats.averageNoiseScore?.toFixed(1) || '0.0'}</p>
+            <p className="text-sm text-gray-500">Noise quality</p>
           </div>
           <div className="w-12 h-12 bg-cyan-100 rounded-lg flex items-center justify-center">
-            <Target className="w-6 h-6 text-cyan-600" />
+            <Grid className="w-6 h-6 text-cyan-600" />
           </div>
         </div>
       </div>
@@ -128,12 +128,12 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ stats, threshold }
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Average Keypoints</p>
-            <p className="text-3xl font-bold text-emerald-600">{Math.round(stats.averageKeypointCount || 0)}</p>
-            <p className="text-sm text-gray-500">Features detected</p>
+            <p className="text-sm font-medium text-gray-600">Success Rate</p>
+            <p className="text-3xl font-bold text-emerald-600">{qualityPercentage.toFixed(1)}%</p>
+            <p className="text-sm text-gray-500">Above threshold</p>
           </div>
           <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-            <Grid className="w-6 h-6 text-emerald-600" />
+            <CheckCircle className="w-6 h-6 text-emerald-600" />
           </div>
         </div>
       </div>

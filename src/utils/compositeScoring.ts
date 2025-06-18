@@ -3,28 +3,22 @@ import { CompositeQualityScore } from '../types';
 export const calculateCompositeScore = (
   blurScore: number,
   exposureScore: number,
-  noiseScore: number,
-  technicalScore: number,
-  descriptorScore: number = 0
+  noiseScore: number
 ): CompositeQualityScore => {
-  // Updated weighted scoring system with descriptor analysis
+  // Simplified weighted scoring system focused on core image quality
   const weights = {
-    blur: 0.30,        // 30% - Still important but reduced
-    exposure: 0.25,    // 25% - Critical for image quality
-    noise: 0.20,       // 20% - Important for detail preservation
-    technical: 0.10,   // 10% - Reduced weight
-    descriptor: 0.15   // 15% - New photogrammetric-specific metric
+    blur: 0.40,        // 40% - Most important for image sharpness
+    exposure: 0.30,    // 30% - Critical for image quality
+    noise: 0.30        // 30% - Important for detail preservation
   };
   
   const overall = Math.round(
     blurScore * weights.blur +
     exposureScore * weights.exposure +
-    noiseScore * weights.noise +
-    technicalScore * weights.technical +
-    descriptorScore * weights.descriptor
+    noiseScore * weights.noise
   );
   
-  // Determine recommendation based on composite score with enhanced thresholds
+  // Determine recommendation based on composite score
   let recommendation: CompositeQualityScore['recommendation'];
   if (overall >= 85) recommendation = 'excellent';
   else if (overall >= 70) recommendation = 'good';
@@ -36,8 +30,6 @@ export const calculateCompositeScore = (
     blur: blurScore,
     exposure: exposureScore,
     noise: noiseScore,
-    technical: technicalScore,
-    descriptor: descriptorScore,
     overall,
     recommendation
   };
@@ -66,27 +58,4 @@ export const getScoreColor = (score: number): string => {
   if (score >= 55) return 'text-yellow-600';
   if (score >= 40) return 'text-orange-600';
   return 'text-red-600';
-};
-
-// Enhanced photogrammetric quality assessment
-export const calculatePhotogrammetricSuitability = (
-  blurScore: number,
-  descriptorScore: number,
-  exposureScore: number,
-  noiseScore: number
-): number => {
-  // Specialized scoring for photogrammetric reconstruction
-  const photogrammetricWeights = {
-    descriptor: 0.40,  // 40% - Most critical for feature matching
-    blur: 0.30,        // 30% - Essential for sharp features
-    exposure: 0.20,    // 20% - Important for consistent lighting
-    noise: 0.10        // 10% - Less critical but still relevant
-  };
-  
-  return Math.round(
-    descriptorScore * photogrammetricWeights.descriptor +
-    blurScore * photogrammetricWeights.blur +
-    exposureScore * photogrammetricWeights.exposure +
-    noiseScore * photogrammetricWeights.noise
-  );
 };

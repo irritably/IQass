@@ -1,13 +1,13 @@
 # Drone Image Quality Analyzer
 
-A professional-grade web application for analyzing the quality of drone imagery for photogrammetric reconstruction. This tool provides comprehensive quality assessment including blur detection, exposure analysis, noise evaluation, and feature extraction to help drone operators and photogrammetrists make informed decisions about image suitability for 3D reconstruction projects.
+A professional-grade web application for analyzing the quality of drone imagery. This tool provides comprehensive quality assessment including blur detection, exposure analysis, and noise evaluation to help drone operators make informed decisions about image suitability for various applications.
 
 ## 🚀 Key Features
 
 ### **Core Analysis Capabilities**
-- **Comprehensive Quality Analysis**: Multi-metric evaluation including blur detection, exposure analysis, noise assessment, and feature extraction
+- **Comprehensive Quality Analysis**: Multi-metric evaluation including blur detection, exposure analysis, and noise assessment
 - **Batch Processing**: Efficient processing of multiple images with real-time progress tracking and GPU acceleration
-- **Photogrammetric Assessment**: Specialized analysis for 3D reconstruction suitability with keypoint detection and descriptor quality evaluation
+- **Professional Assessment**: Specialized analysis for professional drone applications with quality scoring
 
 ### **🎯 Enhanced Interactive Features**
 - **Interactive Threshold Visualization**: Real-time histogram and statistics showing impact of quality threshold changes
@@ -95,7 +95,6 @@ npm run preview
 
 2. **Configure Analysis**
    - Use interactive threshold slider with live histogram visualization
-   - Choose from quick presets (General Mapping, Standard Photogrammetry, High-Precision, Research)
    - See real-time statistics showing recommended vs not recommended counts
    - Review file previews and remove any problematic images
 
@@ -125,7 +124,6 @@ npm run preview
 // Real-time visualization shows impact of threshold changes
 - Adjust slider to see live histogram updates
 - View immediate pass/fail statistics
-- Use quick presets for different project types
 - Make data-driven threshold decisions
 ```
 
@@ -164,7 +162,6 @@ src/
 ├── utils/               # Core algorithms
 │   ├── imageAnalysis.ts # Main analysis pipeline
 │   ├── webglProcessing.ts # GPU acceleration
-│   ├── descriptorAnalysis.ts # Feature detection
 │   ├── enhancedExposureAnalysis.ts # Advanced exposure evaluation
 │   ├── compositeScoring.ts # Quality scoring system
 │   └── qualityAssessment.ts # Statistics and reporting
@@ -323,7 +320,7 @@ For technical support or questions:
 ## 🏆 Acknowledgments
 
 - Built with modern web technologies for cross-platform compatibility
-- Optimized for professional drone operators and photogrammetrists
+- Optimized for professional drone operators and technical users
 - Designed following industry best practices for image quality assessment
 - Enhanced with advanced interactive features and intelligent user guidance
 - Implements cutting-edge performance optimizations with GPU acceleration
@@ -332,7 +329,7 @@ For technical support or questions:
 
 ### Immediate Enhancements
 - Advanced mobile optimization for field use
-- Enhanced export integration with photogrammetry software
+- Enhanced export integration with professional software
 - Machine learning quality prediction models
 - Real-time collaboration features
 

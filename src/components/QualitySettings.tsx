@@ -46,14 +46,6 @@ export const QualitySettings: React.FC<QualitySettingsProps> = ({
 
   const maxCount = Math.max(...histogramData.map(d => d.count), 1);
 
-  // Preset configurations for different project types
-  const presets = [
-    { name: 'General Mapping', value: 40, description: 'Basic aerial mapping and surveying' },
-    { name: 'Standard Photogrammetry', value: 60, description: 'Standard 3D reconstruction projects' },
-    { name: 'High-Precision Work', value: 75, description: 'Engineering and precision mapping' },
-    { name: 'Research Quality', value: 85, description: 'Academic and research applications' }
-  ];
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center space-x-3 mb-6">
@@ -66,7 +58,7 @@ export const QualitySettings: React.FC<QualitySettingsProps> = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium text-gray-700">
-              Minimum Quality Score for Reconstruction
+              Minimum Quality Score for Use
             </label>
             <div className="text-sm font-medium text-blue-600">
               {threshold}
@@ -155,28 +147,6 @@ export const QualitySettings: React.FC<QualitySettingsProps> = ({
             </div>
           </div>
         )}
-
-        {/* Preset Configurations */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-900">Quick Presets</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {presets.map((preset) => (
-              <button
-                key={preset.name}
-                onClick={() => onThresholdChange(preset.value)}
-                className={`p-3 text-left border rounded-lg transition-colors ${
-                  threshold === preset.value
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <div className="font-medium text-sm">{preset.name}</div>
-                <div className="text-xs text-gray-500 mt-1">{preset.description}</div>
-                <div className="text-xs font-medium mt-1">Threshold: {preset.value}</div>
-              </button>
-            ))}
-          </div>
-        </div>
         
         {/* Help Information */}
         <div className="flex items-start space-x-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
@@ -184,9 +154,9 @@ export const QualitySettings: React.FC<QualitySettingsProps> = ({
           <div>
             <p className="font-medium mb-1">Threshold Guidelines:</p>
             <ul className="space-y-1 text-sm">
-              <li>• <strong>40-50:</strong> General mapping and basic surveying</li>
-              <li>• <strong>60-70:</strong> Standard photogrammetric reconstruction</li>
-              <li>• <strong>75+:</strong> High-precision engineering and research work</li>
+              <li>• <strong>40-50:</strong> General use and basic applications</li>
+              <li>• <strong>60-70:</strong> Professional work requiring good quality</li>
+              <li>• <strong>75+:</strong> High-precision applications and critical work</li>
               <li>• Higher thresholds ensure better quality but may reduce usable images</li>
             </ul>
           </div>

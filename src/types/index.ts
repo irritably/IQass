@@ -20,8 +20,6 @@ export interface ImageAnalysis {
   noiseAnalysis?: NoiseAnalysis;
   metadata?: CameraMetadata;
   compositeScore?: CompositeQualityScore;
-  // Descriptor-based analysis for photogrammetric quality
-  descriptorAnalysis?: DescriptorAnalysis;
 }
 
 export interface ExposureAnalysis {
@@ -43,47 +41,6 @@ export interface ExposureAnalysis {
   };
   perceptualExposureScore: number;
   spatialExposureVariance: number;
-}
-
-export interface DescriptorAnalysis {
-  // Feature detection metrics
-  keypointCount: number;
-  keypointDensity: number; // keypoints per 1000 pixels
-  keypointDistribution: {
-    uniformity: number; // 0-100, higher is more uniform
-    coverage: number;   // 0-100, percentage of image covered
-    clustering: number; // 0-100, lower is better (less clustered)
-  };
-  
-  // Feature quality metrics
-  featureStrength: {
-    average: number;
-    median: number;
-    standardDeviation: number;
-  };
-  
-  // Descriptor robustness
-  descriptorQuality: {
-    distinctiveness: number; // 0-100
-    repeatability: number;   // 0-100
-    matchability: number;    // 0-100, predicted matching success
-  };
-  
-  // Photogrammetric suitability
-  photogrammetricScore: number; // 0-100, overall descriptor-based quality
-  reconstructionSuitability: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-  
-  // Feature type analysis
-  featureTypes: {
-    corners: number;
-    edges: number;
-    blobs: number;
-    textured: number;
-  };
-  
-  // Scale and rotation invariance
-  scaleInvariance: number; // 0-100
-  rotationInvariance: number; // 0-100
 }
 
 export interface NoiseAnalysis {
@@ -126,11 +83,9 @@ export interface CameraMetadata {
 }
 
 export interface CompositeQualityScore {
-  blur: number;          // 30% weight
-  exposure: number;      // 25% weight
-  noise: number;         // 20% weight
-  technical: number;     // 10% weight
-  descriptor: number;    // 15% weight
+  blur: number;          // 40% weight
+  exposure: number;      // 30% weight
+  noise: number;         // 30% weight
   overall: number;       // Weighted average
   recommendation: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
 }
@@ -147,8 +102,6 @@ export interface AnalysisStats {
   averageExposureScore: number;
   averageNoiseScore: number;
   averageCompositeScore: number;
-  averageDescriptorScore: number;
-  averageKeypointCount: number;
   cameraStats: {
     [key: string]: number;
   };
