@@ -1,11 +1,11 @@
 /**
  * Performance Benchmarking Hook
  * 
- * This hook provides utilities for benchmarking CPU vs GPU performance
- * and making intelligent decisions about which processing method to use.
+ * Enhanced hook that provides both internal benchmarking capabilities
+ * and user-facing performance insights and controls.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { benchmarkOperation, getPerformanceStats } from '../utils/webglProcessing';
 import { CONFIG } from '../config';
 
@@ -16,12 +16,33 @@ interface BenchmarkResult {
   speedup: number;
   recommendation: 'cpu' | 'gpu';
   imageSize: number;
+  timestamp: number;
 }
 
 interface UseBenchmarkOptions {
   enableLogging?: boolean;
   sampleSize?: number;
   autoOptimize?: boolean;
+}
+
+interface PerformancePreferences {
+  processingMode: 'auto' | 'cpu' | 'gpu';
+  enableGpuAcceleration: boolean;
+  showPerformanceIndicators: boolean;
+  enableBenchmarkHistory: boolean;
+}
+
+interface UserFacingPerformanceStats {
+  totalBenchmarks: number;
+  averageSpeedup: number;
+  averageGpuTime: number;
+  averageCpuTime: number;
+  gpuRecommendationRate: number;
+  operationBreakdown: Record<string, {
+    count: number;
+    avgSpeedup: number;
+    recommendation: 'cpu' | 'gpu';
+  }>;
 }
 
 export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
@@ -31,9 +52,18 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
     autoOptimize = CONFIG.BENCHMARK.AUTO_OPTIMIZE
   } = options;
 
+  // Core benchmarking state
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const benchmarkCache = useRef<Map<string, BenchmarkResult>>(new Map());
+
+  // User-facing state
+  const [preferences, setPreferences] = useState<PerformancePreferences>({
+    processingMode: 'auto',
+    enableGpuAcceleration: true,
+    showPerformanceIndicators: true,
+    enableBenchmarkHistory: true
+  });
 
   /**
    * Runs a performance benchmark comparing CPU and GPU implementations
@@ -60,15 +90,18 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
         gpuTime: benchmark.gpuTime,
         speedup: benchmark.speedup,
         recommendation: benchmark.speedup > 1.2 ? 'gpu' : 'cpu',
-        imageSize
+        imageSize,
+        timestamp: Date.now()
       };
 
       // Cache result for similar image sizes
       const cacheKey = `${operation}_${Math.floor(imageSize / 10000)}`;
       benchmarkCache.current.set(cacheKey, benchmarkResult);
 
-      // Update state
-      setBenchmarkResults(prev => [...prev.slice(-sampleSize + 1), benchmarkResult]);
+      // Update state if history is enabled
+      if (preferences.enableBenchmarkHistory) {
+        setBenchmarkResults(prev => [...prev.slice(-sampleSize + 1), benchmarkResult]);
+      }
 
       if (enableLogging) {
         console.group(`🔬 Performance Benchmark: ${operation}`);
@@ -84,12 +117,16 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
     } finally {
       setIsRunning(false);
     }
-  }, [enableLogging, sampleSize]);
+  }, [enableLogging, sampleSize, preferences.enableBenchmarkHistory]);
 
   /**
    * Gets recommendation for whether to use GPU or CPU based on historical data
    */
   const getRecommendation = useCallback((operation: string, imageSize: number): 'cpu' | 'gpu' | 'unknown' => {
+    // Respect user preferences
+    if (preferences.processingMode === 'cpu') return 'cpu';
+    if (preferences.processingMode === 'gpu') return 'gpu';
+
     // Check cache first
     const cacheKey = `${operation}_${Math.floor(imageSize / 10000)}`;
     const cached = benchmarkCache.current.get(cacheKey);
@@ -119,18 +156,31 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
 
     const avgSpeedup = similarSizeBenchmarks.reduce((sum, b) => sum + b.speedup, 0) / similarSizeBenchmarks.length;
     return avgSpeedup > 1.2 ? 'gpu' : 'cpu';
-  }, [benchmarkResults]);
+  }, [benchmarkResults, preferences.processingMode]);
 
   /**
-   * Gets comprehensive performance statistics
+   * Gets comprehensive performance statistics for user display
    */
-  const getStats = useCallback(() => {
+  const getStats = useCallback((): { global: any; local: UserFacingPerformanceStats } | null => {
     const globalStats = getPerformanceStats();
-    const localStats = {
+    
+    if (benchmarkResults.length === 0) {
+      return globalStats ? { global: globalStats, local: {
+        totalBenchmarks: 0,
+        averageSpeedup: 0,
+        averageGpuTime: 0,
+        averageCpuTime: 0,
+        gpuRecommendationRate: 0,
+        operationBreakdown: {}
+      }} : null;
+    }
+
+    const localStats: UserFacingPerformanceStats = {
       totalBenchmarks: benchmarkResults.length,
-      averageSpeedup: benchmarkResults.length > 0 
-        ? benchmarkResults.reduce((sum, b) => sum + b.speedup, 0) / benchmarkResults.length 
-        : 0,
+      averageSpeedup: benchmarkResults.reduce((sum, b) => sum + b.speedup, 0) / benchmarkResults.length,
+      averageGpuTime: benchmarkResults.reduce((sum, b) => sum + b.gpuTime, 0) / benchmarkResults.length,
+      averageCpuTime: benchmarkResults.reduce((sum, b) => sum + b.cpuTime, 0) / benchmarkResults.length,
+      gpuRecommendationRate: (benchmarkResults.filter(b => b.recommendation === 'gpu').length / benchmarkResults.length) * 100,
       operationBreakdown: benchmarkResults.reduce((acc, b) => {
         if (!acc[b.operation]) {
           acc[b.operation] = { count: 0, avgSpeedup: 0, recommendation: 'cpu' as const };
@@ -180,7 +230,7 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
     }
 
     // Use cached recommendation
-    if (recommendation === 'gpu') {
+    if (recommendation === 'gpu' && preferences.enableGpuAcceleration) {
       try {
         return await gpuFunction();
       } catch (error) {
@@ -192,7 +242,50 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
     } else {
       return await cpuFunction();
     }
-  }, [autoOptimize, getRecommendation, runBenchmark, enableLogging]);
+  }, [autoOptimize, getRecommendation, runBenchmark, enableLogging, preferences.enableGpuAcceleration]);
+
+  /**
+   * Updates user preferences
+   */
+  const updatePreferences = useCallback((newPreferences: Partial<PerformancePreferences>) => {
+    setPreferences(prev => ({ ...prev, ...newPreferences }));
+  }, []);
+
+  /**
+   * Gets current performance status for UI indicators
+   */
+  const getCurrentPerformanceStatus = useCallback(() => {
+    const stats = getStats();
+    const recentBenchmark = benchmarkResults[benchmarkResults.length - 1];
+    
+    return {
+      isGpuAccelerated: preferences.enableGpuAcceleration && recentBenchmark?.recommendation === 'gpu',
+      averageSpeedup: stats?.local.averageSpeedup || 0,
+      processingMode: preferences.processingMode,
+      showIndicators: preferences.showPerformanceIndicators
+    };
+  }, [benchmarkResults, preferences, getStats]);
+
+  /**
+   * Exports benchmark data for user download
+   */
+  const exportBenchmarkData = useCallback(() => {
+    const data = {
+      benchmarkResults,
+      preferences,
+      stats: getStats(),
+      exportDate: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `performance-benchmark-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [benchmarkResults, preferences, getStats]);
 
   return {
     // Core benchmarking
@@ -203,10 +296,14 @@ export const usePerformanceBenchmark = (options: UseBenchmarkOptions = {}) => {
     // State
     benchmarkResults,
     isRunning,
+    preferences,
     
-    // Utilities
+    // User-facing utilities
     getStats,
     clearBenchmarks,
+    updatePreferences,
+    getCurrentPerformanceStatus,
+    exportBenchmarkData,
     
     // Configuration
     enableLogging,
