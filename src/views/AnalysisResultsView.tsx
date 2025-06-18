@@ -27,9 +27,9 @@ export const AnalysisResultsView: React.FC<AnalysisResultsViewProps> = ({
           <div className="bg-blue-50 rounded-lg p-6 max-w-md mx-auto">
             <h3 className="font-medium text-blue-900 mb-2">What you'll find here:</h3>
             <ul className="text-sm text-blue-800 space-y-1 text-left">
-              <li>• Detailed image analysis results</li>
+              <li>• Detailed image analysis results in list or grid view</li>
               <li>• Side-by-side comparison tools</li>
-              <li>• Advanced filtering and sorting</li>
+              <li>• Advanced filtering and sorting options</li>
               <li>• Export options for your workflow</li>
             </ul>
           </div>
@@ -84,10 +84,13 @@ export const AnalysisResultsView: React.FC<AnalysisResultsViewProps> = ({
               <div className="flex items-center space-x-3">
                 <Search className="w-5 h-5 text-gray-600" />
                 <h3 className="text-lg font-semibold text-gray-900">Detailed Results</h3>
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  Default: List View
+                </span>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Filter className="w-4 h-4" />
-                <span>Use filters and comparison tools below</span>
+                <span>Use view toggle, filters and sorting options below</span>
               </div>
             </div>
           </div>
@@ -114,19 +117,21 @@ export const AnalysisResultsView: React.FC<AnalysisResultsViewProps> = ({
           <h4 className="font-medium text-blue-900 mb-3">Results View Features</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-800">
             <div>
-              <h5 className="font-medium mb-1">Image Analysis</h5>
+              <h5 className="font-medium mb-1">View Options</h5>
               <ul className="space-y-1">
+                <li>• Toggle between List and Grid views</li>
+                <li>• Sort by score (High→Low or Low→High)</li>
+                <li>• Filter by quality level or recommendation</li>
                 <li>• Click any image for detailed technical analysis</li>
-                <li>• Use checkboxes to select images for comparison</li>
-                <li>• Filter by quality level or recommendation status</li>
               </ul>
             </div>
             <div>
               <h5 className="font-medium mb-1">Export Options</h5>
               <ul className="space-y-1">
-                <li>• Export CSV data for photogrammetry software</li>
+                <li>• Export CSV data for integration with software</li>
                 <li>• Generate comprehensive quality reports</li>
                 <li>• Download recommended images list</li>
+                <li>• All exports respect current filter settings</li>
               </ul>
             </div>
           </div>
