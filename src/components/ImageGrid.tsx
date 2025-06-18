@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ImageAnalysis } from '../types';
-import { CheckCircle, AlertTriangle, XCircle, Eye, Download, Info } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Eye, Download, Info, ArrowLeftRight } from 'lucide-react';
 import { TechnicalQualityPanel } from './TechnicalQualityPanel';
 import { VirtualizedImageGrid } from './VirtualizedImageGrid';
+import { ImageComparisonModal } from './ImageComparisonModal';
 import { getRecommendationColor } from '../utils/compositeScoring';
 import { useImageFiltering, FilterType, SortType } from '../hooks/useImageFiltering';
 
@@ -31,6 +32,8 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('composite');
   const [selectedImage, setSelectedImage] = useState<ImageAnalysis | null>(null);
+  const [selectedForComparison, setSelectedForComparison] = useState<ImageAnalysis[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
 
   const { filteredAnalyses, filterCounts } = useImageFiltering({
     analyses,
@@ -68,6 +71,37 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
     // TODO: Implement actual download functionality
   };
 
+  /**
+   * Handles image selection for comparison
+   */
+  const toggleImageForComparison = (analysis: ImageAnalysis) => {
+    setSelectedForComparison(prev => {
+      const isSelected = prev.some(img => img.id === analysis.id);
+      if (isSelected) {
+        return prev.filter(img => img.id !== analysis.id);
+      } else if (prev.length < 3) { // Limit to 3 images for comparison
+        return [...prev, analysis];
+      }
+      return prev;
+    });
+  };
+
+  /**
+   * Opens comparison modal
+   */
+  const openComparison = () => {
+    if (selectedForComparison.length >= 2) {
+      setShowComparison(true);
+    }
+  };
+
+  /**
+   * Clears comparison selection
+   */
+  const clearComparison = () => {
+    setSelectedForComparison([]);
+  };
+
   if (analyses.length === 0) return null;
 
   return (
@@ -75,42 +109,74 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {/* Header with Controls */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-            <h3 className="text-lg font-semibold text-gray-900">Image Analysis Results</h3>
-            
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-              {/* Filter Dropdown */}
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as FilterType)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All Images ({filterCounts.all})</option>
-                <option value="recommended">Recommended ({filterCounts.recommended})</option>
-                <option value="not-recommended">Not Recommended ({filterCounts.notRecommended})</option>
-              </select>
+          <div className="flex flex-col space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+              <h3 className="text-lg font-semibold text-gray-900">Image Analysis Results</h3>
               
-              {/* Sort Dropdown */}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortType)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="composite">Sort by Composite Score</option>
-                <option value="score">Sort by Blur Score</option>
-                <option value="name">Sort by Name</option>
-                <option value="quality">Sort by Quality</option>
-              </select>
-              
-              {/* Download Button */}
-              <button
-                onClick={handleDownloadRecommended}
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export Recommended
-              </button>
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                {/* Filter Dropdown */}
+                <select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value as FilterType)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Images ({filterCounts.all})</option>
+                  <option value="recommended">Recommended ({filterCounts.recommended})</option>
+                  <option value="not-recommended">Not Recommended ({filterCounts.notRecommended})</option>
+                </select>
+                
+                {/* Sort Dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortType)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="composite">Sort by Composite Score</option>
+                  <option value="score">Sort by Blur Score</option>
+                  <option value="name">Sort by Name</option>
+                  <option value="quality">Sort by Quality</option>
+                </select>
+                
+                {/* Download Button */}
+                <button
+                  onClick={handleDownloadRecommended}
+                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Recommended
+                </button>
+              </div>
             </div>
+
+            {/* Comparison Controls */}
+            {selectedForComparison.length > 0 && (
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center space-x-3">
+                  <ArrowLeftRight className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">
+                    {selectedForComparison.length} image{selectedForComparison.length !== 1 ? 's' : ''} selected for comparison
+                  </span>
+                  <span className="text-xs text-blue-700">
+                    (Select 2-3 images to compare)
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={openComparison}
+                    disabled={selectedForComparison.length < 2}
+                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Compare Images
+                  </button>
+                  <button
+                    onClick={clearComparison}
+                    className="inline-flex items-center px-3 py-2 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -124,6 +190,9 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
                 threshold={threshold}
                 onSelect={setSelectedImage}
                 getQualityIcon={getQualityIcon}
+                isSelectedForComparison={selectedForComparison.some(img => img.id === analysis.id)}
+                onToggleComparison={toggleImageForComparison}
+                comparisonDisabled={selectedForComparison.length >= 3 && !selectedForComparison.some(img => img.id === analysis.id)}
               />
             ))}
           </div>
@@ -145,6 +214,14 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
           onClose={() => setSelectedImage(null)}
         />
       )}
+
+      {/* Image Comparison Modal */}
+      {showComparison && (
+        <ImageComparisonModal
+          images={selectedForComparison}
+          onClose={() => setShowComparison(false)}
+        />
+      )}
     </>
   );
 };
@@ -157,22 +234,52 @@ interface ImageCardProps {
   threshold: number;
   onSelect: (analysis: ImageAnalysis) => void;
   getQualityIcon: (recommendation: string) => React.ReactNode;
+  isSelectedForComparison: boolean;
+  onToggleComparison: (analysis: ImageAnalysis) => void;
+  comparisonDisabled: boolean;
 }
 
 const ImageCard: React.FC<ImageCardProps> = ({ 
   analysis, 
   threshold, 
   onSelect, 
-  getQualityIcon 
+  getQualityIcon,
+  isSelectedForComparison,
+  onToggleComparison,
+  comparisonDisabled
 }) => {
   const isRecommended = (analysis.compositeScore?.overall || 0) >= threshold;
   const recommendation = analysis.compositeScore?.recommendation || 'unsuitable';
 
   return (
     <div
-      className="group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      className={`group relative bg-gray-50 rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer ${
+        isSelectedForComparison ? 'ring-2 ring-blue-500 shadow-lg' : ''
+      }`}
       onClick={() => onSelect(analysis)}
     >
+      {/* Comparison Selection Checkbox */}
+      <div className="absolute top-2 left-2 z-10">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!comparisonDisabled) {
+              onToggleComparison(analysis);
+            }
+          }}
+          disabled={comparisonDisabled}
+          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+            isSelectedForComparison
+              ? 'bg-blue-600 border-blue-600 text-white'
+              : comparisonDisabled
+              ? 'bg-gray-200 border-gray-300 cursor-not-allowed'
+              : 'bg-white border-gray-300 hover:border-blue-500'
+          }`}
+        >
+          {isSelectedForComparison && <CheckCircle className="w-4 h-4" />}
+        </button>
+      </div>
+
       {/* Image Thumbnail */}
       <div className="aspect-square relative">
         {analysis.thumbnail ? (

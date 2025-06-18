@@ -57,7 +57,8 @@ function App() {
     setProgress({
       current: 0,
       total: files.length,
-      isProcessing: true
+      isProcessing: true,
+      startTime: Date.now()
     });
 
     const newAnalyses: ImageAnalysis[] = [];
@@ -65,6 +66,16 @@ function App() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
+      // Update progress with current image info
+      setProgress(prev => ({
+        ...prev,
+        current: i,
+        currentImageName: file.name,
+        currentStep: 1,
+        currentStepName: 'Loading image...',
+        currentImageProgress: 0
+      }));
+
       try {
         const analysis = await analyzeImage(file);
         newAnalyses.push(analysis);
@@ -86,7 +97,8 @@ function App() {
       // Update progress
       setProgress(prev => ({
         ...prev,
-        current: i + 1
+        current: i + 1,
+        currentImageProgress: 100
       }));
 
       // Update analyses incrementally for better UX
@@ -96,7 +108,11 @@ function App() {
     // Mark processing as complete
     setProgress(prev => ({
       ...prev,
-      isProcessing: false
+      isProcessing: false,
+      currentImageName: undefined,
+      currentStep: undefined,
+      currentStepName: undefined,
+      currentImageProgress: undefined
     }));
   }, []);
 
@@ -117,11 +133,12 @@ function App() {
           {/* Progress Bar */}
           <ProgressBar progress={progress} />
 
-          {/* Settings */}
+          {/* Settings with Live Visualization */}
           {analyses.length > 0 && (
             <QualitySettings 
               threshold={threshold}
               onThresholdChange={setThreshold}
+              analyses={analyses}
             />
           )}
 
@@ -135,7 +152,7 @@ function App() {
             <QualityHistogram analyses={analyses} />
           )}
 
-          {/* Image Grid */}
+          {/* Image Grid with Comparison Features */}
           <ImageGrid analyses={analyses} threshold={threshold} />
 
           {/* Export Section */}
