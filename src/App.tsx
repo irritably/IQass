@@ -8,6 +8,7 @@ import { ImageGrid } from './components/ImageGrid';
 import { QualityHistogram } from './components/QualityHistogram';
 import { ReportExport } from './components/ReportExport';
 import { DevToolsPanel } from './components/DevToolsPanel';
+import { DevPerformancePanel } from './components/DevPerformancePanel';
 import { ImageAnalysis, ProcessingProgress, AnalysisStats } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
 import { calculateQualityStatistics } from './utils/qualityAssessment';
@@ -228,6 +229,9 @@ function App() {
         isVisible={devToolsVisible}
         onToggle={() => setDevToolsVisible(!devToolsVisible)}
       />
+
+      {/* Development Performance Panel */}
+      <DevPerformancePanel />
     </div>
   );
 }
