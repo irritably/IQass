@@ -1,25 +1,50 @@
-/**
- * Enhanced Type Definitions for Drone Image Quality Analyzer v2.0
- * 
- * This module contains improved TypeScript interfaces with better organization,
- * clear units, configurable thresholds, and separation of UI from data concerns.
- */
+# Data Schema Documentation v2.0 - Drone Image Quality Analyzer
 
-// ============================================================================
-// CORE DATA TYPES
-// ============================================================================
+This document provides a comprehensive overview of the improved data types, structures, and metrics for the Drone Image Quality Analyzer, addressing consistency, clarity, and separation of concerns.
 
-export interface FileInput {
-  file: File;
+## Table of Contents
+
+1. [Schema Improvements](#schema-improvements)
+2. [Core Data Types](#core-data-types)
+3. [Analysis Results](#analysis-results)
+4. [Configuration & Thresholds](#configuration--thresholds)
+5. [Processing State](#processing-state)
+6. [UI State (Separated)](#ui-state-separated)
+7. [Export Formats](#export-formats)
+8. [Performance Metrics](#performance-metrics)
+9. [Data Flow](#data-flow)
+
+---
+
+## Schema Improvements
+
+### Fixed Issues from v1.0
+
+1. **✅ Consistent Optional Field Notation**: Using `Type | null` instead of `Type?`
+2. **✅ Reduced Verbosity**: Grouped related fields under nested objects
+3. **✅ UI/Data Separation**: Moved UI state to separate interfaces
+4. **✅ Configurable Thresholds**: Externalized hardcoded values to config objects
+5. **✅ Clear Units**: Added explicit units and scales to all metrics
+6. **✅ Composite Score Breakdown**: Added detailed scoring breakdown structure
+7. **✅ Clarified Field Names**: Improved naming for better hierarchy and clarity
+
+---
+
+## Core Data Types
+
+### File Input & Validation
+```typescript
+interface FileInput {
+  file: File;                    // Original browser File object
   metadata: {
-    name: string;
-    size: number;                // Bytes
-    type: string;                // MIME type
+    name: string;                // Original filename
+    size: number;                // File size in bytes
+    type: string;                // MIME type (e.g., 'image/jpeg')
     lastModified: number;        // Unix timestamp
   };
   validation: {
     isValid: boolean;
-    error: string | null;
+    error: string | null;        // Error message if invalid
     constraints: {
       supportedTypes: string[];  // ['image/jpeg', 'image/png', 'image/tiff']
       maxSize: number;           // 52,428,800 bytes (50MB)
@@ -27,8 +52,11 @@ export interface FileInput {
     };
   };
 }
+```
 
-export interface ProcessedImageData {
+### Image Processing Data
+```typescript
+interface ProcessedImageData {
   dimensions: {
     original: { width: number; height: number };        // Original image size
     processed: { width: number; height: number };       // Limited to 800px max
@@ -50,12 +78,15 @@ export interface ProcessedImageData {
     processingTime: number;      // Time taken in milliseconds
   };
 }
+```
 
-// ============================================================================
-// ANALYSIS RESULTS
-// ============================================================================
+---
 
-export interface BlurAnalysis {
+## Analysis Results
+
+### Blur Analysis (Enhanced)
+```typescript
+interface BlurAnalysis {
   score: number;                 // 0-100 scale, higher = sharper
   metrics: {
     laplacianVariance: number;   // Raw variance value (0+)
@@ -77,8 +108,11 @@ export interface BlurAnalysis {
     recommendation: string;      // Human-readable recommendation
   };
 }
+```
 
-export interface ExposureAnalysis {
+### Exposure Analysis (Restructured)
+```typescript
+interface ExposureAnalysis {
   score: number;                 // 0-100 composite exposure quality
   histogram: {
     overexposure: {
@@ -131,28 +165,12 @@ export interface ExposureAnalysis {
       clippingPenalty: number;   // 0-100, penalty for extreme clipping
     };
   };
-  
-  // Legacy fields for backward compatibility
-  overexposurePercentage: number;
-  underexposurePercentage: number;
-  dynamicRange: number;
-  averageBrightness: number;
-  contrastRatio: number;
-  histogramBalance: 'balanced' | 'underexposed' | 'overexposed' | 'high-contrast';
-  localContrast: number;
-  highlightRecovery: number;
-  shadowDetail: number;
-  colorBalance: {
-    y: number;
-    cr: number;
-    cb: number;
-  };
-  perceptualExposureScore: number;
-  spatialExposureVariance: number;
-  exposureScore: number;
 }
+```
 
-export interface FeatureAnalysis {
+### Feature Detection (Hierarchical)
+```typescript
+interface FeatureAnalysis {
   detection: {
     keypoints: {
       total: number;             // Total detected features (0+)
@@ -200,38 +218,12 @@ export interface FeatureAnalysis {
       };
     };
   };
-  
-  // Legacy fields for backward compatibility
-  keypointCount: number;
-  keypointDensity: number;
-  keypointDistribution: {
-    uniformity: number;
-    coverage: number;
-    clustering: number;
-  };
-  featureStrength: {
-    average: number;
-    median: number;
-    standardDeviation: number;
-  };
-  descriptorQuality: {
-    distinctiveness: number;
-    repeatability: number;
-    matchability: number;
-  };
-  photogrammetricScore: number;
-  reconstructionSuitability: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-  featureTypes: {
-    corners: number;
-    edges: number;
-    blobs: number;
-    textured: number;
-  };
-  scaleInvariance: number;
-  rotationInvariance: number;
 }
+```
 
-export interface NoiseAnalysis {
+### Noise Analysis (Detailed)
+```typescript
+interface NoiseAnalysis {
   score: number;                 // 0-100, overall noise quality (higher = less noise)
   measurements: {
     level: number;               // 0-100, noise magnitude via local std dev
@@ -263,102 +255,16 @@ export interface NoiseAnalysis {
     reconstructionImpact: 'minimal' | 'low' | 'moderate' | 'high' | 'severe';
     recommendations: string[];   // Specific improvement suggestions
   };
-  
-  // Legacy fields for backward compatibility
-  noiseLevel: number;
-  snrRatio: number;
-  compressionArtifacts: number;
-  chromaticAberration: number;
-  vignetting: number;
-  overallArtifactScore: number;
-  noiseScore: number;
 }
+```
 
-export interface CameraMetadata {
-  camera: {
-    make?: string;
-    model?: string;
-    lens?: string;
-  };
-  settings: {
-    iso?: number;
-    aperture?: number;
-    shutterSpeed?: string;
-    focalLength?: number;
-    whiteBalance?: string;
-    meteringMode?: string;
-  };
-  location: {
-    latitude?: number;
-    longitude?: number;
-    altitude?: number;
-  };
-  timestamp?: Date;
-  colorSpace?: string;
-  fileFormat: {
-    format: string;
-    compression?: string;
-    bitDepth?: number;
-    colorProfile?: string;
-  };
-}
+---
 
-export interface CompositeScoreBreakdown {
-  overall: number;               // 0-100 final score
-  components: {
-    blur: {
-      rawScore: number;          // 0-100 original score
-      weight: number;            // 0-1 weight applied
-      contribution: number;      // Weighted points added
-    };
-    exposure: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-    noise: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-    technical: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-    descriptor: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-  };
-  calculation: {
-    method: 'weighted_average' | 'photogrammetric_specialized';
-    weightsUsed: Record<string, number>;
-    normalization: string;       // Description of normalization applied
-  };
-  recommendation: {
-    classification: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-    confidence: number;          // 0-100% confidence in classification
-    reasoning: string[];         // Factors influencing classification
-  };
-  
-  // Legacy fields for backward compatibility
-  blur: number;
-  exposure: number;
-  noise: number;
-  technical: number;
-  descriptor: number;
-  recommendation: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-}
+## Configuration & Thresholds
 
-export interface CompositeQualityScore extends CompositeScoreBreakdown {}
-
-// ============================================================================
-// CONFIGURATION & THRESHOLDS
-// ============================================================================
-
-export interface QualityThresholds {
+### Quality Thresholds (Configurable)
+```typescript
+interface QualityThresholds {
   blur: {
     excellent: number;           // 85+ (default)
     good: number;                // 70-84 (default)
@@ -397,8 +303,11 @@ export interface QualityThresholds {
     };
   };
 }
+```
 
-export interface SceneConfiguration {
+### Scene-Adaptive Configuration
+```typescript
+interface SceneConfiguration {
   sceneType: 'aerial_sky' | 'ground_detail' | 'mixed' | 'auto';
   adaptiveThresholds: {
     blur: {
@@ -421,12 +330,15 @@ export interface SceneConfiguration {
     detectionConfidence: number; // 0-100% scene detection confidence
   };
 }
+```
 
-// ============================================================================
-// PROCESSING STATE
-// ============================================================================
+---
 
-export interface ProcessingProgress {
+## Processing State
+
+### Processing Progress (Restructured)
+```typescript
+interface ProcessingProgress {
   batch: {
     current: number;             // Images processed (0+)
     total: number;               // Total images in batch (1+)
@@ -459,19 +371,12 @@ export interface ProcessingProgress {
     cpuUtilization: number;      // 0-100% estimated
     gpuAcceleration: boolean;    // Whether GPU is being used
   };
-  
-  // Legacy fields for backward compatibility
-  current: number;
-  total: number;
-  isProcessing: boolean;
-  startTime?: number;
-  currentImageName?: string;
-  currentStep?: number;
-  currentStepName?: string;
-  currentImageProgress?: number;
 }
+```
 
-export interface AnalysisStatistics {
+### Analysis Statistics (Enhanced)
+```typescript
+interface AnalysisStatistics {
   summary: {
     totalImages: number;
     processedSuccessfully: number;
@@ -507,31 +412,16 @@ export interface AnalysisStatistics {
       gpuAccelerated: number;    // Count processed with GPU
     };
   };
-  
-  // Legacy fields for backward compatibility
-  totalImages: number;
-  excellentCount: number;
-  goodCount: number;
-  acceptableCount: number;
-  poorCount: number;
-  unsuitableCount: number;
-  averageBlurScore: number;
-  averageCompositeScore: number;
-  averageDescriptorScore: number;
-  averageKeypointCount: number;
-  recommendedForReconstruction: number;
-  averageExposureScore: number;
-  averageNoiseScore: number;
-  cameraStats: Record<string, number>;
 }
+```
 
-export interface AnalysisStats extends AnalysisStatistics {}
+---
 
-// ============================================================================
-// UI STATE (SEPARATED)
-// ============================================================================
+## UI State (Separated)
 
-export interface UIState {
+### User Interface State
+```typescript
+interface UIState {
   display: {
     threshold: number;           // 0-100 quality threshold
     filter: 'all' | 'recommended' | 'not-recommended' | 'needs-review';
@@ -558,8 +448,11 @@ export interface UIState {
     colorScheme: 'light' | 'dark' | 'auto';
   };
 }
+```
 
-export interface ViewState {
+### View State Management
+```typescript
+interface ViewState {
   layout: {
     sidebarCollapsed: boolean;
     fullscreenMode: boolean;
@@ -587,96 +480,59 @@ export interface ViewState {
     };
   };
 }
+```
 
-// ============================================================================
-// MAIN IMAGE ANALYSIS INTERFACE
-// ============================================================================
+---
 
-export interface ImageAnalysis {
-  id: string;
-  file: File;
-  name: string;
-  size: number;
-  blurScore: number;
-  quality: 'excellent' | 'good' | 'poor' | 'unsuitable';
-  thumbnail: string;
-  processed: boolean;
-  error?: string;
-  
-  // Enhanced analysis results
-  blurAnalysis?: BlurAnalysis;
-  exposureAnalysis?: ExposureAnalysis;
-  featureAnalysis?: FeatureAnalysis;
-  noiseAnalysis?: NoiseAnalysis;
-  metadata?: CameraMetadata;
-  compositeScore?: CompositeQualityScore;
-  
-  // Legacy compatibility
-  descriptorAnalysis?: FeatureAnalysis;
-  
-  // Processing information
-  processingInfo?: {
-    mode: 'cpu' | 'gpu' | 'hybrid';
-    duration: number;           // Milliseconds
-    memoryUsed: number;         // Bytes
-    sceneDetected: string;      // Scene type detected
+## Export Formats
+
+### Composite Score Breakdown (New)
+```typescript
+interface CompositeScoreBreakdown {
+  overall: number;               // 0-100 final score
+  components: {
+    blur: {
+      rawScore: number;          // 0-100 original score
+      weight: number;            // 0-1 weight applied
+      contribution: number;      // Weighted points added
+    };
+    exposure: {
+      rawScore: number;
+      weight: number;
+      contribution: number;
+    };
+    noise: {
+      rawScore: number;
+      weight: number;
+      contribution: number;
+    };
+    technical: {
+      rawScore: number;
+      weight: number;
+      contribution: number;
+    };
+    descriptor: {
+      rawScore: number;
+      weight: number;
+      contribution: number;
+    };
+  };
+  calculation: {
+    method: 'weighted_average' | 'photogrammetric_specialized';
+    weightsUsed: Record<string, number>;
+    normalization: string;       // Description of normalization applied
+  };
+  recommendation: {
+    classification: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
+    confidence: number;          // 0-100% confidence in classification
+    reasoning: string[];         // Factors influencing classification
   };
 }
+```
 
-// ============================================================================
-// PERFORMANCE METRICS
-// ============================================================================
-
-export interface WebGLPerformanceMetrics {
-  capabilities: {
-    webglVersion: '1.0' | '2.0' | 'none';
-    maxTextureSize: number;      // Maximum texture dimensions
-    supportsHighPrecision: boolean;
-    supportsFloatTextures: boolean;
-    extensions: string[];        // Available WebGL extensions
-  };
-  benchmarks: {
-    operation: string;           // 'blur_detection', 'harris_corners', etc.
-    imageSize: number;           // Pixel count
-    cpuTime: number;             // Milliseconds
-    gpuTime: number;             // Milliseconds
-    speedup: number;             // cpuTime / gpuTime
-    memoryUsage: number;         // Estimated bytes
-    timestamp: number;           // Unix timestamp
-  }[];
-  statistics: {
-    averageSpeedup: number;      // Overall GPU vs CPU performance
-    totalBenchmarks: number;
-    recommendedMode: 'cpu' | 'gpu' | 'hybrid';
-    performanceTrend: 'improving' | 'stable' | 'degrading';
-  };
-}
-
-export interface MemoryMetrics {
-  usage: {
-    current: number;             // Current memory usage in MB
-    peak: number;                // Peak memory usage in MB
-    available: number;           // Estimated available memory in MB
-  };
-  allocation: {
-    imageData: number;           // Memory for image processing in MB
-    thumbnails: number;          // Memory for thumbnails in MB
-    webglContexts: number;       // Memory for WebGL contexts in MB
-    analysisResults: number;     // Memory for analysis data in MB
-  };
-  optimization: {
-    lazyLoadingActive: boolean;
-    virtualizationThreshold: number; // Image count threshold
-    contextPoolSize: number;     // Number of pooled WebGL contexts
-    garbageCollectionTriggers: number; // Manual GC trigger count
-  };
-}
-
-// ============================================================================
-// EXPORT FORMATS
-// ============================================================================
-
-export interface CSVExportRow {
+### Enhanced CSV Export Schema
+```typescript
+interface CSVExportRow {
   // Basic Information
   filename: string;
   fileSize: string;              // "2.1 MB" format
@@ -728,3 +584,295 @@ export interface CSVExportRow {
   errorDetails: string;          // Error message if failed
   warnings: string;              // Comma-separated warnings
 }
+```
+
+---
+
+## Performance Metrics
+
+### WebGL Performance Tracking
+```typescript
+interface WebGLPerformanceMetrics {
+  capabilities: {
+    webglVersion: '1.0' | '2.0' | 'none';
+    maxTextureSize: number;      // Maximum texture dimensions
+    supportsHighPrecision: boolean;
+    supportsFloatTextures: boolean;
+    extensions: string[];        // Available WebGL extensions
+  };
+  benchmarks: {
+    operation: string;           // 'blur_detection', 'harris_corners', etc.
+    imageSize: number;           // Pixel count
+    cpuTime: number;             // Milliseconds
+    gpuTime: number;             // Milliseconds
+    speedup: number;             // cpuTime / gpuTime
+    memoryUsage: number;         // Estimated bytes
+    timestamp: number;           // Unix timestamp
+  }[];
+  statistics: {
+    averageSpeedup: number;      // Overall GPU vs CPU performance
+    totalBenchmarks: number;
+    recommendedMode: 'cpu' | 'gpu' | 'hybrid';
+    performanceTrend: 'improving' | 'stable' | 'degrading';
+  };
+}
+```
+
+### Memory Management Metrics
+```typescript
+interface MemoryMetrics {
+  usage: {
+    current: number;             // Current memory usage in MB
+    peak: number;                // Peak memory usage in MB
+    available: number;           // Estimated available memory in MB
+  };
+  allocation: {
+    imageData: number;           // Memory for image processing in MB
+    thumbnails: number;          // Memory for thumbnails in MB
+    webglContexts: number;       // Memory for WebGL contexts in MB
+    analysisResults: number;     // Memory for analysis data in MB
+  };
+  optimization: {
+    lazyLoadingActive: boolean;
+    virtualizationThreshold: number; // Image count threshold
+    contextPoolSize: number;     // Number of pooled WebGL contexts
+    garbageCollectionTriggers: number; // Manual GC trigger count
+  };
+}
+```
+
+---
+
+## Data Flow
+
+### Complete Processing Pipeline
+```
+File Input & Validation
+         ↓
+Image Loading & Preprocessing
+         ↓
+Metadata Extraction (EXIF)
+         ↓
+Scene Detection & Configuration
+         ↓
+Parallel Analysis Pipeline:
+├── Blur Analysis (CPU/GPU)
+├── Exposure Analysis  
+├── Noise Analysis
+├── Feature Detection
+└── Technical Assessment
+         ↓
+Composite Score Calculation
+         ↓
+Quality Classification
+         ↓
+Results Aggregation & Statistics
+         ↓
+UI State Update & Display
+         ↓
+Export Generation (Optional)
+```
+
+### Error Handling Flow
+```
+Processing Error
+         ↓
+Error Classification:
+├── Validation Error (file format, size)
+├── Loading Error (corrupted, unsupported)
+├── Analysis Error (algorithm failure)
+└── System Error (memory, GPU)
+         ↓
+Fallback Strategy:
+├── Retry with different parameters
+├── Switch to CPU processing
+├── Skip problematic analysis
+└── Create error analysis result
+         ↓
+User Notification & Logging
+```
+
+---
+
+## Future Schema Extensions
+
+### Planned Enhancements
+
+1. **Environmental Context**
+```typescript
+interface EnvironmentalContext {
+  lighting: {
+    sunAngle: number | null;     // Degrees above horizon
+    cloudCover: 'clear' | 'partly_cloudy' | 'overcast' | 'unknown';
+    shadowDirection: number | null; // Degrees from north
+  };
+  atmospheric: {
+    visibility: 'excellent' | 'good' | 'hazy' | 'poor' | 'unknown';
+    humidity: number | null;     // 0-100% if available
+    temperature: number | null;  // Celsius if available
+  };
+  terrain: {
+    type: 'urban' | 'rural' | 'water' | 'forest' | 'desert' | 'mixed';
+    elevation: number | null;    // Meters above sea level
+    slope: number | null;        // Degrees from horizontal
+  };
+}
+```
+
+2. **Flight Context** (for drone imagery)
+```typescript
+interface FlightContext {
+  mission: {
+    id: string;                  // Mission identifier
+    plannedAltitude: number;     // Planned flight altitude
+    plannedOverlap: number;      // Planned image overlap percentage
+    flightPattern: 'grid' | 'linear' | 'circular' | 'manual';
+  };
+  sequence: {
+    imageNumber: number;         // Position in flight sequence
+    totalImages: number;         // Total images in mission
+    timeFromStart: number;       // Seconds from mission start
+    gpsAccuracy: number | null;  // GPS accuracy in meters
+  };
+  aircraft: {
+    model: string;               // Drone model
+    batteryLevel: number | null; // 0-100% at capture time
+    windSpeed: number | null;    // m/s if available
+    gimbalStabilization: boolean;
+  };
+}
+```
+
+3. **User Feedback Integration**
+```typescript
+interface UserFeedback {
+  qualityAssessment: {
+    userRating: number | null;   // 1-5 user quality rating
+    agreesWithRecommendation: boolean | null;
+    comments: string;            // Free-form user comments
+  };
+  corrections: {
+    suggestedClassification: string | null;
+    reportedIssues: string[];    // User-reported problems
+    improvementSuggestions: string[];
+  };
+  usage: {
+    actuallyUsedForReconstruction: boolean | null;
+    reconstructionQuality: 'excellent' | 'good' | 'poor' | null;
+    processingTime: number | null; // Time spent in photogrammetry software
+  };
+}
+```
+
+---
+
+## JSON Schema Example
+
+```json
+{
+  "imageAnalysis": {
+    "id": "img_001_analysis",
+    "file": {
+      "metadata": {
+        "name": "DJI_0123.jpg",
+        "size": 8388608,
+        "type": "image/jpeg"
+      }
+    },
+    "processing": {
+      "dimensions": {
+        "original": { "width": 4000, "height": 3000 },
+        "processed": { "width": 800, "height": 600 }
+      },
+      "colorSpace": {
+        "detected": "BT.709",
+        "recommended": "BT.709"
+      }
+    },
+    "analysis": {
+      "blur": {
+        "score": 78,
+        "metrics": {
+          "laplacianVariance": 1247.3,
+          "sceneAdaptation": {
+            "sceneType": "aerial_sky",
+            "normalizationFactor": 12,
+            "adaptiveScore": 82
+          }
+        }
+      },
+      "exposure": {
+        "score": 85,
+        "histogram": {
+          "overexposure": {
+            "percentage": 3.2,
+            "threshold": 245
+          },
+          "distribution": {
+            "balance": "balanced"
+          }
+        }
+      },
+      "features": {
+        "detection": {
+          "keypoints": {
+            "total": 1247,
+            "density": 2.6
+          }
+        },
+        "descriptor": {
+          "photogrammetric": {
+            "score": 87,
+            "suitability": "excellent"
+          }
+        }
+      }
+    },
+    "composite": {
+      "overall": 82,
+      "breakdown": {
+        "blur": {
+          "rawScore": 78,
+          "weight": 0.30,
+          "contribution": 23.4
+        },
+        "exposure": {
+          "rawScore": 85,
+          "weight": 0.25,
+          "contribution": 21.25
+        }
+      },
+      "recommendation": {
+        "classification": "good",
+        "confidence": 92
+      }
+    }
+  }
+}
+```
+
+---
+
+## Migration Guide from v1.0
+
+### Breaking Changes
+1. **Field Restructuring**: Many flat fields moved to nested objects
+2. **Naming Changes**: Some fields renamed for clarity
+3. **Type Changes**: Optional fields now use `| null` instead of `?`
+4. **UI Separation**: UI state moved to separate interfaces
+
+### Migration Steps
+1. Update TypeScript interfaces to match new schema
+2. Modify data access patterns for nested structures
+3. Separate UI state management from analysis data
+4. Update export functions for new CSV schema
+5. Implement new configuration system for thresholds
+
+### Backward Compatibility
+- Legacy data can be converted using provided migration utilities
+- Old export formats supported with deprecation warnings
+- Gradual migration path available for existing implementations
+
+---
+
+*This v2.0 schema addresses all identified issues and provides a robust foundation for production deployment with clear separation of concerns, configurable thresholds, and comprehensive data structures.*
