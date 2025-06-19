@@ -8,11 +8,16 @@ import {
   Activity,
   Target,
   Zap,
-  ChevronRight
+  ChevronRight,
+  Home,
+  FileText,
+  TrendingUp
 } from 'lucide-react';
 
 interface DashboardSidebarProps {
   collapsed: boolean;
+  onNavigate?: (section: string) => void;
+  activeSection?: string;
 }
 
 interface SidebarItem {
@@ -22,17 +27,30 @@ interface SidebarItem {
   badge?: string;
   active?: boolean;
   children?: SidebarItem[];
+  onClick?: () => void;
 }
 
-export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed }) => {
-  const [activeItem, setActiveItem] = useState('upload');
+export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ 
+  collapsed, 
+  onNavigate,
+  activeSection = 'upload'
+}) => {
   const [expandedItems, setExpandedItems] = useState<string[]>(['analysis']);
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    onNavigate?.(sectionId);
+  };
 
   const sidebarItems: SidebarItem[] = [
     {
       id: 'upload',
       label: 'Upload Images',
       icon: <Upload className="w-5 h-5" />,
+      onClick: () => scrollToSection('upload-section')
     },
     {
       id: 'analysis',
@@ -43,16 +61,19 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed })
           id: 'overview',
           label: 'Overview',
           icon: <BarChart3 className="w-4 h-4" />,
+          onClick: () => scrollToSection('stats-section')
         },
         {
           id: 'quality',
           label: 'Quality Metrics',
           icon: <Target className="w-4 h-4" />,
+          onClick: () => scrollToSection('histogram-section')
         },
         {
-          id: 'performance',
-          label: 'Performance',
-          icon: <Zap className="w-4 h-4" />,
+          id: 'settings',
+          label: 'Threshold Settings',
+          icon: <Settings className="w-4 h-4" />,
+          onClick: () => scrollToSection('settings-section')
         },
       ]
     },
@@ -60,17 +81,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed })
       id: 'results',
       label: 'Image Results',
       icon: <ImageIcon className="w-5 h-5" />,
-      badge: '24',
+      onClick: () => scrollToSection('results-section')
     },
     {
       id: 'export',
       label: 'Export Data',
       icon: <Download className="w-5 h-5" />,
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: <Settings className="w-5 h-5" />,
+      onClick: () => scrollToSection('export-section')
     },
   ];
 
@@ -83,7 +100,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed })
   };
 
   const renderSidebarItem = (item: SidebarItem, level = 0) => {
-    const isActive = activeItem === item.id;
+    const isActive = activeSection === item.id;
     const isExpanded = expandedItems.includes(item.id);
     const hasChildren = item.children && item.children.length > 0;
 
@@ -91,9 +108,10 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ collapsed })
       <div key={item.id}>
         <button
           onClick={() => {
-            setActiveItem(item.id);
             if (hasChildren) {
               toggleExpanded(item.id);
+            } else if (item.onClick) {
+              item.onClick();
             }
           }}
           className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 group ${

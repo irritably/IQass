@@ -121,7 +121,7 @@ function App() {
     <DashboardLayout>
       <div className="space-y-8">
         {/* Upload Section */}
-        <div className="animate-fade-in-up">
+        <div id="upload-section" className="animate-fade-in-up">
           <ModernFileUpload 
             onFilesSelected={handleFilesSelected}
             isProcessing={progress.isProcessing}
@@ -135,7 +135,7 @@ function App() {
 
         {/* Settings */}
         {analyses.length > 0 && (
-          <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div id="settings-section" className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <QualitySettings 
               threshold={threshold}
               onThresholdChange={setThreshold}
@@ -145,25 +145,25 @@ function App() {
 
         {/* Stats Overview */}
         {analyses.length > 0 && (
-          <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          <div id="stats-section" className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
             <ModernStatsOverview stats={stats} threshold={threshold} />
           </div>
         )}
 
         {/* Quality Histogram */}
         {analyses.length > 0 && (
-          <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+          <div id="histogram-section" className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
             <QualityHistogram analyses={analyses} />
           </div>
         )}
 
         {/* Image Grid */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+        <div id="results-section" className="animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
           <ImageGrid analyses={analyses} threshold={threshold} />
         </div>
 
         {/* Export Section */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+        <div id="export-section" className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
           <ReportExport analyses={analyses} threshold={threshold} />
         </div>
       </div>

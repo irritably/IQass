@@ -8,6 +8,11 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeSection, setActiveSection] = useState('upload');
+
+  const handleNavigate = (section: string) => {
+    setActiveSection(section);
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
@@ -19,7 +24,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       
       <div className="flex">
         {/* Sidebar */}
-        <DashboardSidebar collapsed={sidebarCollapsed} />
+        <DashboardSidebar 
+          collapsed={sidebarCollapsed} 
+          onNavigate={handleNavigate}
+          activeSection={activeSection}
+        />
         
         {/* Main Content */}
         <main className={`flex-1 transition-all duration-300 ${
