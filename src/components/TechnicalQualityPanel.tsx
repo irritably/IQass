@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ImageAnalysis } from '../types';
-import { Camera, Aperture, Zap, Gauge, MapPin, Calendar, Settings, Target, Grid, Layers, ChevronDown, ChevronRight, Info, Eye } from 'lucide-react';
+import { Camera, Aperture, Zap, Gauge, MapPin, Calendar, Settings, Target, Grid, Layers, ChevronDown, ChevronRight, Info, Eye, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { getScoreColor, getRecommendationColor } from '../utils/compositeScoring';
 import { DebugVisualizationModal } from './DebugVisualizationModal';
 
@@ -235,6 +235,18 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
               </div>
             </div>
           </div>
+
+          {/* Exposure Analysis Explanation */}
+          <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+            <h6 className="font-medium text-orange-900 mb-2">Understanding Exposure Analysis</h6>
+            <div className="text-sm text-orange-800 space-y-1">
+              <p><strong>Histogram Balance:</strong> Distribution of tones across the image (balanced is ideal)</p>
+              <p><strong>Dynamic Range:</strong> Difference between darkest and brightest areas (higher is better)</p>
+              <p><strong>Local Contrast:</strong> Spatial variation in brightness (30+ is good for detail)</p>
+              <p><strong>Highlight/Shadow Recovery:</strong> Percentage of detail retained in bright/dark areas</p>
+              <p><strong>Perceptual Score:</strong> Human vision-weighted quality assessment</p>
+            </div>
+          </div>
         </CollapsibleSection>
 
         {/* Feature Analysis */}
@@ -305,6 +317,18 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Feature Analysis Explanation */}
+            <div className="mt-4 p-3 bg-cyan-50 rounded-lg border border-cyan-200">
+              <h6 className="font-medium text-cyan-900 mb-2">Understanding Feature Analysis</h6>
+              <div className="text-sm text-cyan-800 space-y-1">
+                <p><strong>Keypoint Count:</strong> Number of distinctive features detected (500+ is excellent)</p>
+                <p><strong>Feature Density:</strong> Features per 1000 pixels (higher density = more detail)</p>
+                <p><strong>Distribution Uniformity:</strong> How evenly features are spread across the image</p>
+                <p><strong>Matchability:</strong> Predicted success rate for feature matching between images</p>
+                <p><strong>Scale/Rotation Invariance:</strong> Robustness to viewing angle changes</p>
               </div>
             </div>
           </CollapsibleSection>
@@ -378,14 +402,27 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
             </div>
           </div>
 
-          {/* Noise Analysis Explanation */}
+          {/* Enhanced Noise Analysis Explanation */}
           <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-            <h6 className="font-medium text-purple-900 mb-2">Understanding Noise Metrics</h6>
+            <h6 className="font-medium text-purple-900 mb-2">Understanding Noise & Artifact Metrics</h6>
             <div className="text-sm text-purple-800 space-y-1">
-              <p><strong>Raw Standard Deviation (σ):</strong> Direct measurement of pixel value variation</p>
-              <p><strong>Noise Level:</strong> User-friendly 0-100 scale derived from σ (lower is better)</p>
+              <p><strong>Raw Standard Deviation (σ):</strong> Direct measurement of pixel value variation in 8×8 blocks</p>
+              <p><strong>Noise Level:</strong> User-friendly 0-100 scale derived from σ (lower is better, &lt;10 is excellent)</p>
               <p><strong>SNR Ratio:</strong> Signal-to-noise ratio (higher is better, &gt;20 is excellent)</p>
-              <p><strong>Artifacts:</strong> Specific image quality issues (lower percentages are better)</p>
+              <p><strong>Compression Artifacts:</strong> JPEG blocking and edge discontinuities (&lt;10 is good)</p>
+              <p><strong>Chromatic Aberration:</strong> Color fringing using Sobel gradient analysis (&lt;5 is excellent)</p>
+              <p><strong>Vignetting:</strong> Corner darkening using radial brightness modeling (&lt;10% is good)</p>
+            </div>
+          </div>
+
+          {/* Algorithm Details */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <h6 className="font-medium text-gray-900 mb-2">Detection Algorithms</h6>
+            <div className="text-sm text-gray-700 space-y-1">
+              <p><strong>Compression:</strong> Enhanced DCT-based blocking detection with edge continuity analysis</p>
+              <p><strong>Chromatic Aberration:</strong> Multi-channel Sobel gradient comparison for color misalignment</p>
+              <p><strong>Vignetting:</strong> Radial brightness profiling with polynomial model fitting</p>
+              <p><strong>Noise:</strong> Block-based standard deviation with perceptual scaling</p>
             </div>
           </div>
         </CollapsibleSection>
@@ -466,6 +503,17 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
                 </div>
               </div>
             )}
+
+            {/* Camera Settings Explanation */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <h6 className="font-medium text-gray-900 mb-2">Camera Settings Impact</h6>
+              <div className="text-sm text-gray-700 space-y-1">
+                <p><strong>ISO:</strong> Lower values (≤400) reduce noise, higher values may introduce grain</p>
+                <p><strong>Aperture:</strong> f/5.6-f/11 typically provides optimal sharpness for aerial photography</p>
+                <p><strong>Shutter Speed:</strong> Faster speeds reduce motion blur from drone movement</p>
+                <p><strong>Focal Length:</strong> Affects field of view and perspective distortion</p>
+              </div>
+            </div>
           </CollapsibleSection>
         )}
 
@@ -477,9 +525,18 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
               Photogrammetric Reconstruction Assessment
             </h5>
             <div className="text-sm text-blue-800 space-y-2">
-              <p>
-                <strong>Suitability:</strong> {descriptorAnalysis.reconstructionSuitability.charAt(0).toUpperCase() + descriptorAnalysis.reconstructionSuitability.slice(1)}
-              </p>
+              <div className="flex items-center space-x-2">
+                {descriptorAnalysis.photogrammetricScore >= 70 ? (
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                ) : descriptorAnalysis.photogrammetricScore >= 55 ? (
+                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-600" />
+                )}
+                <p>
+                  <strong>Suitability:</strong> {descriptorAnalysis.reconstructionSuitability.charAt(0).toUpperCase() + descriptorAnalysis.reconstructionSuitability.slice(1)}
+                </p>
+              </div>
               <p>
                 <strong>Feature Quality:</strong> {descriptorAnalysis.keypointCount} keypoints detected with {descriptorAnalysis.descriptorQuality.matchability}% predicted matchability
               </p>

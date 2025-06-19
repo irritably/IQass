@@ -51,11 +51,56 @@ export const EXPOSURE_WEIGHTS = {
   localContrast: 0.70       // Weight in spatial metrics
 };
 
-// Noise analysis configuration
+// Enhanced noise analysis configuration
 export const NOISE_CONFIG = {
   blockSize: 8,             // Block size for noise analysis
   snrThreshold: 10,         // Minimum acceptable SNR
-  artifactThreshold: 15     // Maximum acceptable artifact level
+  artifactThreshold: 15,    // Maximum acceptable artifact level
+  
+  // Noise scaling parameters
+  noiseScaling: {
+    maxStdDev: 20,          // Maximum standard deviation for scaling
+    goodThreshold: 5,       // Good image threshold
+    noisyThreshold: 15      // Noisy image threshold
+  },
+  
+  // Artifact detection weights
+  artifactWeights: {
+    compression: 0.4,       // 40% weight for compression artifacts
+    chromatic: 0.3,         // 30% weight for chromatic aberration
+    vignetting: 0.3         // 30% weight for vignetting
+  },
+  
+  // Scoring penalties and rewards
+  penalties: {
+    noiseLevelMultiplier: 2,    // Multiplier for noise level penalty
+    maxNoisePenalty: 40,        // Maximum penalty for noise
+    artifactMultiplier: 0.5,    // Multiplier for artifact penalty
+    maxArtifactPenalty: 30      // Maximum penalty for artifacts
+  },
+  
+  rewards: {
+    snrMultiplier: 0.5,         // Multiplier for SNR reward
+    maxSnrBonus: 20             // Maximum bonus for good SNR
+  },
+  
+  // Compression artifact detection thresholds
+  compressionThresholds: {
+    maxBlockingScore: 15,       // Maximum blocking score for normalization
+    continuityWeight: 2         // Weight for edge continuity analysis
+  },
+  
+  // Chromatic aberration detection thresholds
+  chromaticThresholds: {
+    minEdgeStrength: 20,        // Minimum edge strength to analyze
+    scalingFactor: 50           // Scaling factor for normalization
+  },
+  
+  // Vignetting detection parameters
+  vignettingWeights: {
+    linearDrop: 0.7,            // Weight for linear brightness drop
+    nonLinear: 0.3              // Weight for non-linear artifacts
+  }
 };
 
 // Feature detection configuration
