@@ -384,7 +384,7 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
             <div className="text-sm text-purple-800 space-y-1">
               <p><strong>Raw Standard Deviation (σ):</strong> Direct measurement of pixel value variation</p>
               <p><strong>Noise Level:</strong> User-friendly 0-100 scale derived from σ (lower is better)</p>
-              <p><strong>SNR Ratio:</strong> Signal-to-noise ratio (higher is better, >20 is excellent)</p>
+              <p><strong>SNR Ratio:</strong> Signal-to-noise ratio (higher is better, &gt;20 is excellent)</p>
               <p><strong>Artifacts:</strong> Specific image quality issues (lower percentages are better)</p>
             </div>
           </div>
