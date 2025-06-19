@@ -7,7 +7,7 @@ import { StatsOverview } from './components/StatsOverview';
 import { ImageGrid } from './components/ImageGrid';
 import { QualityHistogram } from './components/QualityHistogram';
 import { ReportExport } from './components/ReportExport';
-import { ImageAnalysis, ProcessingProgress, AnalysisStats } from './types';
+import { ImageAnalysis, ProcessingProgress, AnalysisStats, ProcessingStep } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
 import { calculateQualityStatistics } from './utils/qualityAssessment';
 
@@ -51,22 +51,43 @@ function App() {
   }, [threshold]);
 
   /**
-   * Handles file selection and processes images sequentially
+   * Handles file selection and processes images sequentially with enhanced progress tracking
    */
   const handleFilesSelected = useCallback(async (files: File[]) => {
+    const startTime = Date.now();
+    
     setProgress({
       current: 0,
       total: files.length,
-      isProcessing: true
+      isProcessing: true,
+      startTime
     });
 
     const newAnalyses: ImageAnalysis[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const imageStartTime = Date.now();
       
+      // Update progress with current image info
+      setProgress(prev => ({
+        ...prev,
+        current: i,
+        currentImageName: file.name,
+        currentStep: ProcessingStep.EXTRACT,
+        imageDuration: Date.now() - imageStartTime
+      }));
+
       try {
-        const analysis = await analyzeImage(file);
+        const analysis = await analyzeImage(file, (step, stepProgress) => {
+          setProgress(prev => ({
+            ...prev,
+            currentStep: step,
+            currentImageProgress: stepProgress,
+            imageDuration: Date.now() - imageStartTime
+          }));
+        });
+        
         newAnalyses.push(analysis);
       } catch (error) {
         // Create error analysis if processing fails
@@ -79,24 +100,30 @@ function App() {
           quality: 'unsuitable',
           thumbnail: '',
           processed: true,
-          error: 'Analysis failed'
+          error: 'Analysis failed',
+          processingDuration: Date.now() - imageStartTime
         });
       }
 
-      // Update progress
+      // Update progress and analyses incrementally for better UX
       setProgress(prev => ({
         ...prev,
-        current: i + 1
+        current: i + 1,
+        imageDuration: Date.now() - imageStartTime
       }));
 
-      // Update analyses incrementally for better UX
+      // Update analyses incrementally
       setAnalyses(prev => [...prev, ...newAnalyses.slice(i, i + 1)]);
     }
 
     // Mark processing as complete
     setProgress(prev => ({
       ...prev,
-      isProcessing: false
+      isProcessing: false,
+      currentImageName: undefined,
+      currentStep: undefined,
+      currentImageProgress: undefined,
+      imageDuration: undefined
     }));
   }, []);
 

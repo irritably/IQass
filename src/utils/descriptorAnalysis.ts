@@ -1,4 +1,5 @@
 import { DescriptorAnalysis } from '../types';
+import { FEATURE_CONFIG } from './config';
 
 export interface Keypoint {
   x: number;
@@ -8,8 +9,6 @@ export interface Keypoint {
   angle: number;
   type: 'corner' | 'edge' | 'blob' | 'textured';
 }
-
-const MAX_KEYPOINTS_PER_DETECTOR = 500; // Limit keypoints per detector to prevent stack overflow
 
 export const analyzeDescriptors = (imageData: ImageData): DescriptorAnalysis => {
   const { data, width, height } = imageData;
@@ -54,7 +53,8 @@ export const analyzeDescriptors = (imageData: ImageData): DescriptorAnalysis => 
     reconstructionSuitability,
     featureTypes,
     scaleInvariance,
-    rotationInvariance
+    rotationInvariance,
+    descriptorType: 'harris-fast-hybrid' // Current implementation type
   };
 };
 
@@ -72,39 +72,39 @@ const extractKeypoints = (data: Uint8ClampedArray, width: number, height: number
   const harrisKeypoints = harrisCornerDetection(grayscale, width, height);
   const limitedHarris = harrisKeypoints
     .sort((a, b) => b.strength - a.strength)
-    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+    .slice(0, FEATURE_CONFIG.maxKeypointsPerDetector);
   keypoints.push(...limitedHarris);
   
   // FAST corner detection - limit and sort before adding
   const fastKeypoints = fastCornerDetection(grayscale, width, height);
   const limitedFast = fastKeypoints
     .sort((a, b) => b.strength - a.strength)
-    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+    .slice(0, FEATURE_CONFIG.maxKeypointsPerDetector);
   keypoints.push(...limitedFast);
   
   // Edge detection - limit and sort before adding
   const edgeKeypoints = edgeBasedKeypoints(grayscale, width, height);
   const limitedEdge = edgeKeypoints
     .sort((a, b) => b.strength - a.strength)
-    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+    .slice(0, FEATURE_CONFIG.maxKeypointsPerDetector);
   keypoints.push(...limitedEdge);
   
   // Blob detection - limit and sort before adding
   const blobKeypoints = blobDetection(grayscale, width, height);
   const limitedBlob = blobKeypoints
     .sort((a, b) => b.strength - a.strength)
-    .slice(0, MAX_KEYPOINTS_PER_DETECTOR);
+    .slice(0, FEATURE_CONFIG.maxKeypointsPerDetector);
   keypoints.push(...limitedBlob);
   
   // Remove duplicates and sort by strength - now with manageable array size
   const uniqueKeypoints = removeDuplicateKeypoints(keypoints);
-  return uniqueKeypoints.sort((a, b) => b.strength - a.strength).slice(0, 2000); // Limit to top 2000
+  return uniqueKeypoints.sort((a, b) => b.strength - a.strength).slice(0, FEATURE_CONFIG.totalKeypointLimit);
 };
 
 const harrisCornerDetection = (grayscale: Float32Array, width: number, height: number): Keypoint[] => {
   const keypoints: Keypoint[] = [];
   const threshold = 0.01;
-  const k = 0.04;
+  const k = FEATURE_CONFIG.harrisK;
   
   // Calculate gradients
   const Ix = new Float32Array(width * height);
@@ -157,7 +157,7 @@ const harrisCornerDetection = (grayscale: Float32Array, width: number, height: n
 
 const fastCornerDetection = (grayscale: Float32Array, width: number, height: number): Keypoint[] => {
   const keypoints: Keypoint[] = [];
-  const threshold = 20;
+  const threshold = FEATURE_CONFIG.fastThreshold;
   
   // FAST-9 circle offsets
   const circle = [
@@ -200,6 +200,7 @@ const fastCornerDetection = (grayscale: Float32Array, width: number, height: num
 
 const edgeBasedKeypoints = (grayscale: Float32Array, width: number, height: number): Keypoint[] => {
   const keypoints: Keypoint[] = [];
+  const threshold = FEATURE_CONFIG.edgeThreshold;
   
   // Sobel edge detection
   for (let y = 1; y < height - 1; y++) {
@@ -215,7 +216,7 @@ const edgeBasedKeypoints = (grayscale: Float32Array, width: number, height: numb
       
       const magnitude = Math.sqrt(gx * gx + gy * gy);
       
-      if (magnitude > 50) {
+      if (magnitude > threshold) {
         keypoints.push({
           x,
           y,
@@ -233,6 +234,7 @@ const edgeBasedKeypoints = (grayscale: Float32Array, width: number, height: numb
 
 const blobDetection = (grayscale: Float32Array, width: number, height: number): Keypoint[] => {
   const keypoints: Keypoint[] = [];
+  const threshold = FEATURE_CONFIG.blobThreshold;
   
   // Simplified LoG (Laplacian of Gaussian) approximation
   for (let y = 2; y < height - 2; y++) {
@@ -255,7 +257,7 @@ const blobDetection = (grayscale: Float32Array, width: number, height: number): 
         }
       }
       
-      if (Math.abs(response) > 100) {
+      if (Math.abs(response) > threshold) {
         keypoints.push({
           x,
           y,

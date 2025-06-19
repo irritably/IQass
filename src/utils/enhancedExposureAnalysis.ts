@@ -1,4 +1,5 @@
 import { ExposureAnalysis } from '../types';
+import { EXPOSURE_WEIGHTS } from './config';
 
 export const analyzeEnhancedExposure = (imageData: ImageData): ExposureAnalysis => {
   const { data, width, height } = imageData;
@@ -20,12 +21,20 @@ export const analyzeEnhancedExposure = (imageData: ImageData): ExposureAnalysis 
   // Apply bias correction and normalization
   const correctedMetrics = applyBiasCorrection(basicMetrics, spatialMetrics);
   
+  // Calculate weighting contributions for documentation
+  const weightingContribution = {
+    highlightRecovery: EXPOSURE_WEIGHTS.highlightRecovery,
+    shadowDetail: EXPOSURE_WEIGHTS.shadowDetail,
+    localContrast: EXPOSURE_WEIGHTS.localContrast
+  };
+  
   return {
     ...basicMetrics,
     ...spatialMetrics,
     colorBalance: colorMetrics,
     perceptualExposureScore: perceptualScore,
-    exposureScore: calculateEnhancedExposureScore(basicMetrics, spatialMetrics, perceptualScore)
+    exposureScore: calculateEnhancedExposureScore(basicMetrics, spatialMetrics, perceptualScore),
+    weightingContribution
   };
 };
 
@@ -94,7 +103,7 @@ const calculateBasicExposureMetrics = (luminance: Float32Array, width: number, h
   const minLuminance = Math.min(...luminanceValues);
   const contrastRatio = maxLuminance > 0 ? (maxLuminance + 0.05) / (minLuminance + 0.05) : 1;
   
-  // Determine histogram balance
+  // Determine histogram balance (now includes low-contrast)
   let histogramBalance: ExposureAnalysis['histogramBalance'];
   if (overexposurePercentage > 5) {
     histogramBalance = 'overexposed';
@@ -102,6 +111,8 @@ const calculateBasicExposureMetrics = (luminance: Float32Array, width: number, h
     histogramBalance = 'underexposed';
   } else if (contrastRatio > 15) {
     histogramBalance = 'high-contrast';
+  } else if (contrastRatio < 3) {
+    histogramBalance = 'low-contrast';
   } else {
     histogramBalance = 'balanced';
   }
@@ -264,10 +275,8 @@ const calculatePerceptualExposureScore = (yCrCbData: YCrCbData, width: number, h
     histogram[bin]++;
   }
   
-  // Penalize poor distribution
-  const totalPixels = y.length;
-  
   // Check for proper exposure distribution (bell curve-like)
+  const totalPixels = y.length;
   const midtoneRange = histogram.slice(64, 192).reduce((sum, count) => sum + count, 0);
   const midtonePercentage = (midtoneRange / totalPixels) * 100;
   
@@ -340,12 +349,8 @@ const calculateEnhancedExposureScore = (
 ): number => {
   let score = 100;
   
-  // Weight different components
-  const weights = {
-    basic: 0.4,      // 40% - Traditional metrics
-    spatial: 0.35,   // 35% - Spatial analysis
-    perceptual: 0.25 // 25% - Perceptual quality
-  };
+  // Weight different components using configuration
+  const weights = EXPOSURE_WEIGHTS;
   
   // Basic exposure penalties
   score -= Math.min(basicMetrics.overexposurePercentage * 2, 30);
@@ -356,8 +361,12 @@ const calculateEnhancedExposureScore = (
   const dynamicRangeScore = Math.min(basicMetrics.dynamicRange / optimalDynamicRange, 1) * 20;
   score = Math.max(0, score - 20 + dynamicRangeScore);
   
-  // Spatial quality adjustments
-  const spatialScore = (spatialMetrics.localContrast + spatialMetrics.highlightRecovery + spatialMetrics.shadowDetail) / 3;
+  // Spatial quality adjustments with documented weights
+  const spatialScore = (
+    spatialMetrics.localContrast * weights.localContrast +
+    spatialMetrics.highlightRecovery * weights.highlightRecovery +
+    spatialMetrics.shadowDetail * weights.shadowDetail
+  );
   
   // Combine all scores
   const finalScore = 

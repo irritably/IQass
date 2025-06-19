@@ -5,6 +5,9 @@
  * with context pooling, performance benchmarking, and precision optimization.
  */
 
+import { WebGLCapabilities, PerformanceBenchmark } from '../types';
+import { WEBGL_CONFIG } from './config';
+
 interface WebGLContext {
   gl: WebGLRenderingContext | WebGL2RenderingContext;
   canvas: HTMLCanvasElement;
@@ -13,33 +16,11 @@ interface WebGLContext {
   cleanup: () => void;
 }
 
-interface PerformanceBenchmark {
-  operation: string;
-  cpuTime: number;
-  gpuTime: number;
-  imageSize: number;
-  speedup: number;
-  timestamp: number;
-}
-
-interface WebGLCapabilities {
-  webgl: boolean;
-  webgl2: boolean;
-  maxTextureSize: number;
-  maxViewportDims: [number, number];
-  extensions: string[];
-  supportsHighPrecision: boolean;
-  supportsFloatTextures: boolean;
-}
-
 // Global context pool
 const contextPool: WebGLContext[] = [];
-const MAX_POOL_SIZE = 3;
-const CONTEXT_TIMEOUT = 30000; // 30 seconds
 
 // Performance tracking
 const performanceBenchmarks: PerformanceBenchmark[] = [];
-const MAX_BENCHMARKS = 100;
 
 /**
  * Vertex shader source code (standard for image processing)
@@ -125,7 +106,7 @@ const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
 `;
 
 /**
- * Enhanced WebGL capabilities detection
+ * Enhanced WebGL capabilities detection with browser/GPU info
  */
 export const getWebGLCapabilities = (): WebGLCapabilities => {
   const capabilities: WebGLCapabilities = {
@@ -164,6 +145,22 @@ export const getWebGLCapabilities = (): WebGLCapabilities => {
       
       capabilities.extensions = extensionNames.filter(ext => gl.getExtension(ext));
       capabilities.supportsFloatTextures = capabilities.extensions.includes('OES_texture_float');
+      
+      // Extract browser and GPU information
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        capabilities.browserInfo = {
+          userAgent: navigator.userAgent,
+          vendor: navigator.vendor,
+          renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+        };
+        
+        capabilities.gpuInfo = {
+          vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+          renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL),
+          version: gl.getParameter(gl.VERSION)
+        };
+      }
     }
   } catch (error) {
     console.warn('Error checking WebGL capabilities:', error);
@@ -236,7 +233,7 @@ const getWebGLContext = (width: number, height: number): WebGLContext | null => 
   // Clean up expired contexts
   const now = Date.now();
   for (let i = contextPool.length - 1; i >= 0; i--) {
-    if (now - contextPool[i].lastUsed > CONTEXT_TIMEOUT) {
+    if (now - contextPool[i].lastUsed > WEBGL_CONFIG.contextTimeout) {
       contextPool[i].cleanup();
       contextPool.splice(i, 1);
     }
@@ -251,7 +248,7 @@ const getWebGLContext = (width: number, height: number): WebGLContext | null => 
   }
 
   // Create new context if pool isn't full
-  if (contextPool.length < MAX_POOL_SIZE) {
+  if (contextPool.length < WEBGL_CONFIG.contextPoolSize) {
     const newContext = createWebGLContext(width, height);
     if (newContext) {
       contextPool.push(newContext);
@@ -332,37 +329,52 @@ const getProgram = (
 };
 
 /**
- * Performance benchmarking utility
+ * Performance benchmarking utility with enhanced error handling
  */
-const benchmarkOperation = async <T>(
+export const benchmarkOperation = async <T>(
   operation: string,
   cpuFunction: () => Promise<T> | T,
   gpuFunction: () => Promise<T> | T,
   imageSize: number
 ): Promise<{ result: T; benchmark: PerformanceBenchmark }> => {
-  // Benchmark CPU version
+  //  Benchmark CPU version
   const cpuStart = performance.now();
   const cpuResult = await cpuFunction();
   const cpuTime = performance.now() - cpuStart;
 
   // Benchmark GPU version
   const gpuStart = performance.now();
-  const gpuResult = await gpuFunction();
-  const gpuTime = performance.now() - gpuStart;
+  let gpuResult: T;
+  let gpuTime: number;
+  
+  try {
+    gpuResult = await gpuFunction();
+    gpuTime = performance.now() - gpuStart;
+  } catch (error) {
+    console.warn('GPU function failed, using CPU result:', error);
+    gpuResult = cpuResult;
+    gpuTime = cpuTime; // Use CPU time as fallback
+  }
 
-  const speedup = cpuTime / gpuTime;
+  // Prevent division by zero
+  const safeGpuTime = Math.max(gpuTime, 0.001); // Minimum 0.001ms
+  const speedup = cpuTime / safeGpuTime;
+  
+  const capabilities = getWebGLCapabilities();
   const benchmark: PerformanceBenchmark = {
     operation,
     cpuTime,
-    gpuTime,
+    gpuTime: safeGpuTime,
     imageSize,
     speedup,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    browserInfo: capabilities.browserInfo?.userAgent,
+    gpuInfo: capabilities.gpuInfo?.renderer
   };
 
   // Store benchmark (keep only recent ones)
   performanceBenchmarks.push(benchmark);
-  if (performanceBenchmarks.length > MAX_BENCHMARKS) {
+  if (performanceBenchmarks.length > WEBGL_CONFIG.benchmarkHistorySize) {
     performanceBenchmarks.shift();
   }
 
@@ -370,7 +382,7 @@ const benchmarkOperation = async <T>(
   if (process.env.NODE_ENV === 'development') {
     console.log(`Performance Benchmark - ${operation}:`, {
       cpuTime: `${cpuTime.toFixed(2)}ms`,
-      gpuTime: `${gpuTime.toFixed(2)}ms`,
+      gpuTime: `${safeGpuTime.toFixed(2)}ms`,
       speedup: `${speedup.toFixed(2)}x`,
       imageSize: `${imageSize} pixels`
     });
@@ -710,14 +722,14 @@ export const shouldUseWebGL = (imageData: ImageData): boolean => {
   
   // Use performance history to make smarter decisions
   const stats = getPerformanceStats();
-  if (stats && stats.averageSpeedup < 1.5) {
+  if (stats && stats.averageSpeedup < WEBGL_CONFIG.speedupThreshold) {
     // If GPU isn't significantly faster, don't use it
     return false;
   }
   
   // Use WebGL for larger images where the performance benefit is significant
   const pixelCount = imageData.width * imageData.height;
-  const minPixelsForWebGL = stats && stats.averageSpeedup > 3 ? 50000 : 100000;
+  const minPixelsForWebGL = stats && stats.averageSpeedup > 3 ? 50000 : WEBGL_CONFIG.minPixelsForGPU;
   
   // Check if image fits within WebGL texture size limits
   const maxSize = capabilities.maxTextureSize;
@@ -739,8 +751,3 @@ export const cleanupWebGL = () => {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', cleanupWebGL);
 }
-
-/**
- * Export benchmarking utility for external use
- */
-export { benchmarkOperation };

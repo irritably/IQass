@@ -1,10 +1,27 @@
 import React from 'react';
-import { ProcessingProgress } from '../types';
+import { ProcessingProgress, ProcessingStep } from '../types';
 import { Clock, Zap, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface ProgressBarProps {
   progress: ProcessingProgress;
 }
+
+const getStepName = (step: ProcessingStep): string => {
+  switch (step) {
+    case ProcessingStep.UPLOAD:
+      return 'Uploading files';
+    case ProcessingStep.EXTRACT:
+      return 'Extracting metadata';
+    case ProcessingStep.PROCESS:
+      return 'Processing image';
+    case ProcessingStep.ANALYZE:
+      return 'Analyzing quality';
+    case ProcessingStep.EXPORT:
+      return 'Finalizing results';
+    default:
+      return 'Processing';
+  }
+};
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   if (!progress.isProcessing && progress.current === 0) return null;
@@ -35,6 +52,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
     const elapsed = Date.now() - (progress.startTime || Date.now());
     const speed = (progress.current / (elapsed / 1000)).toFixed(1);
     return `${speed} images/sec`;
+  };
+
+  const getCurrentStepName = (): string => {
+    if (progress.currentStep) {
+      return getStepName(progress.currentStep);
+    }
+    return progress.currentStepName || 'Processing';
   };
 
   return (
@@ -149,7 +173,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
             {isComplete 
               ? 'Ready for review' 
               : progress.isProcessing 
-              ? 'Analyzing blur metrics...' 
+              ? getCurrentStepName()
               : 'Processing stopped'
             }
           </span>
@@ -173,8 +197,13 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
                 Step {progress.currentStep || 1} of 5
               </p>
               <p className="text-xs text-blue-500">
-                {progress.currentStepName || 'Analyzing...'}
+                {getCurrentStepName()}
               </p>
+              {progress.imageDuration && (
+                <p className="text-xs text-blue-500">
+                  {progress.imageDuration.toFixed(0)}ms elapsed
+                </p>
+              )}
             </div>
           </div>
           

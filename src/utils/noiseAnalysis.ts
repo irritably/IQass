@@ -1,21 +1,15 @@
-export interface NoiseAnalysis {
-  noiseLevel: number;
-  snrRatio: number;
-  compressionArtifacts: number;
-  chromaticAberration: number;
-  vignetting: number;
-  overallArtifactScore: number;
-  noiseScore: number;
-}
+import { NoiseAnalysis } from '../types';
+import { NOISE_CONFIG } from './config';
 
 export const analyzeNoise = (imageData: ImageData): NoiseAnalysis => {
   const { data, width, height } = imageData;
   
-  // Calculate noise level using local standard deviation
-  const noiseLevel = calculateNoiseLevel(data, width, height);
+  // Calculate raw standard deviation first
+  const rawStandardDeviation = calculateRawStandardDeviation(data, width, height);
   
-  // Calculate signal-to-noise ratio
-  const snrRatio = calculateSNR(data, width, height);
+  // Derive noise level and SNR from raw standard deviation
+  const noiseLevel = deriveNoiseLevel(rawStandardDeviation);
+  const snrRatio = deriveSNR(data, rawStandardDeviation);
   
   // Detect compression artifacts (simplified JPEG blocking detection)
   const compressionArtifacts = detectCompressionArtifacts(data, width, height);
@@ -40,6 +34,7 @@ export const analyzeNoise = (imageData: ImageData): NoiseAnalysis => {
   noiseScore = Math.max(0, Math.min(100, Math.round(noiseScore)));
   
   return {
+    rawStandardDeviation: Math.round(rawStandardDeviation * 1000) / 1000,
     noiseLevel: Math.round(noiseLevel * 100) / 100,
     snrRatio: Math.round(snrRatio * 100) / 100,
     compressionArtifacts: Math.round(compressionArtifacts * 100) / 100,
@@ -50,8 +45,11 @@ export const analyzeNoise = (imageData: ImageData): NoiseAnalysis => {
   };
 };
 
-const calculateNoiseLevel = (data: Uint8ClampedArray, width: number, height: number): number => {
-  const blockSize = 8;
+/**
+ * Calculates raw standard deviation (σ) for noise measurement
+ */
+const calculateRawStandardDeviation = (data: Uint8ClampedArray, width: number, height: number): number => {
+  const blockSize = NOISE_CONFIG.blockSize;
   let totalVariance = 0;
   let blockCount = 0;
   
@@ -70,27 +68,41 @@ const calculateNoiseLevel = (data: Uint8ClampedArray, width: number, height: num
       const mean = blockValues.reduce((sum, val) => sum + val, 0) / blockValues.length;
       const variance = blockValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / blockValues.length;
       
-      totalVariance += Math.sqrt(variance);
+      totalVariance += variance;
       blockCount++;
     }
   }
   
-  return blockCount > 0 ? totalVariance / blockCount : 0;
+  const avgVariance = blockCount > 0 ? totalVariance / blockCount : 0;
+  return Math.sqrt(avgVariance);
 };
 
-const calculateSNR = (data: Uint8ClampedArray, width: number, height: number): number => {
-  const luminanceValues: number[] = [];
+/**
+ * Derives user-visible noise level from raw standard deviation
+ */
+const deriveNoiseLevel = (rawStdDev: number): number => {
+  // Convert raw standard deviation to 0-100 scale
+  // Empirically determined scaling based on typical image noise levels
+  return Math.min(100, (rawStdDev / 25) * 100);
+};
+
+/**
+ * Derives signal-to-noise ratio from image data and raw standard deviation
+ */
+const deriveSNR = (data: Uint8ClampedArray, rawStdDev: number): number => {
+  // Calculate mean luminance
+  let totalLuminance = 0;
+  const pixelCount = data.length / 4;
   
   for (let i = 0; i < data.length; i += 4) {
     const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-    luminanceValues.push(luminance);
+    totalLuminance += luminance;
   }
   
-  const mean = luminanceValues.reduce((sum, val) => sum + val, 0) / luminanceValues.length;
-  const variance = luminanceValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / luminanceValues.length;
-  const standardDeviation = Math.sqrt(variance);
+  const meanLuminance = totalLuminance / pixelCount;
   
-  return mean > 0 ? mean / standardDeviation : 0;
+  // Calculate SNR as mean/standard deviation
+  return rawStdDev > 0 ? meanLuminance / rawStdDev : 0;
 };
 
 const detectCompressionArtifacts = (data: Uint8ClampedArray, width: number, height: number): number => {

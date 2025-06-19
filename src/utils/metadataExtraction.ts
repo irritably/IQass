@@ -1,33 +1,5 @@
 import exifr from 'exifr';
-
-export interface CameraMetadata {
-  camera: {
-    make?: string;
-    model?: string;
-    lens?: string;
-  };
-  settings: {
-    iso?: number;
-    aperture?: number;
-    shutterSpeed?: string;
-    focalLength?: number;
-    whiteBalance?: string;
-    meteringMode?: string;
-  };
-  location: {
-    latitude?: number;
-    longitude?: number;
-    altitude?: number;
-  };
-  timestamp?: Date;
-  colorSpace?: string;
-  fileFormat: {
-    format: string;
-    compression?: string;
-    bitDepth?: number;
-    colorProfile?: string;
-  };
-}
+import { CameraMetadata } from '../types';
 
 export const extractMetadata = async (file: File): Promise<CameraMetadata> => {
   try {
@@ -53,19 +25,21 @@ export const extractMetadata = async (file: File): Promise<CameraMetadata> => {
         focalLength: exifData?.FocalLength || undefined,
         whiteBalance: getWhiteBalanceString(exifData?.WhiteBalance),
         meteringMode: getMeteringModeString(exifData?.MeteringMode),
+        orientation: exifData?.Orientation || undefined,
       },
       location: {
         latitude: exifData?.latitude || undefined,
         longitude: exifData?.longitude || undefined,
         altitude: exifData?.GPSAltitude || undefined,
       },
-      timestamp: exifData?.DateTimeOriginal || exifData?.DateTime || undefined,
+      timestamp: formatTimestamp(exifData?.DateTimeOriginal || exifData?.DateTime),
       colorSpace: getColorSpaceString(exifData?.ColorSpace),
       fileFormat: {
         format: getFileFormat(file.type),
         compression: exifData?.Compression ? getCompressionString(exifData.Compression) : undefined,
         bitDepth: exifData?.BitsPerSample || undefined,
         colorProfile: exifData?.ColorSpace ? getColorSpaceString(exifData.ColorSpace) : undefined,
+        iccProfileName: extractICCProfileName(exifData),
       }
     };
 
@@ -92,6 +66,33 @@ const formatShutterSpeed = (exposureTime?: number): string | undefined => {
     const fraction = Math.round(1 / exposureTime);
     return `1/${fraction}s`;
   }
+};
+
+const formatTimestamp = (timestamp?: Date | string): CameraMetadata['timestamp'] => {
+  if (!timestamp) return undefined;
+  
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  
+  if (isNaN(date.getTime())) return undefined;
+  
+  return {
+    original: timestamp.toString(),
+    utc: date.toISOString()
+  };
+};
+
+const extractICCProfileName = (exifData: any): string | undefined => {
+  // Try to extract ICC profile name from various possible fields
+  if (exifData?.icc?.ProfileDescription) {
+    return exifData.icc.ProfileDescription;
+  }
+  if (exifData?.ColorSpace === 1) {
+    return 'sRGB';
+  }
+  if (exifData?.ColorSpace === 2) {
+    return 'Adobe RGB';
+  }
+  return undefined;
 };
 
 const getWhiteBalanceString = (whiteBalance?: number): string | undefined => {
@@ -217,28 +218,97 @@ const getFileFormat = (mimeType: string): string => {
   return formatMap[mimeType.toLowerCase()] || 'Unknown';
 };
 
+/**
+ * Calculates technical score based on metadata quality and camera settings
+ * Now properly scaled to 0-100 range
+ */
 export const calculateTechnicalScore = (metadata: CameraMetadata): number => {
   let score = 50; // Base score
   
-  // Reward presence of complete metadata
+  // Reward presence of complete metadata (30 points total)
   if (metadata.camera.make && metadata.camera.model) score += 10;
   if (metadata.settings.iso && metadata.settings.aperture) score += 10;
   if (metadata.location.latitude && metadata.location.longitude) score += 5;
   if (metadata.timestamp) score += 5;
   
-  // Evaluate camera settings quality
+  // Evaluate camera settings quality (30 points total)
   if (metadata.settings.iso) {
-    if (metadata.settings.iso <= 400) score += 10;
-    else if (metadata.settings.iso <= 800) score += 5;
-    else if (metadata.settings.iso <= 1600) score += 0;
+    if (metadata.settings.iso <= 400) score += 15;
+    else if (metadata.settings.iso <= 800) score += 10;
+    else if (metadata.settings.iso <= 1600) score += 5;
+    else if (metadata.settings.iso <= 3200) score += 0;
     else score -= 5;
   }
   
-  // Evaluate file format
+  // Evaluate aperture settings (10 points)
+  if (metadata.settings.aperture) {
+    if (metadata.settings.aperture >= 5.6 && metadata.settings.aperture <= 11) score += 10;
+    else if (metadata.settings.aperture >= 4 && metadata.settings.aperture <= 16) score += 5;
+    else score += 0;
+  }
+  
+  // Evaluate file format and color management (20 points total)
   if (metadata.fileFormat.format === 'TIFF') score += 10;
   else if (metadata.fileFormat.format === 'PNG') score += 5;
   else if (metadata.fileFormat.format === 'JPEG') score += 0;
   else score -= 5;
   
+  // Reward proper color management
+  if (metadata.fileFormat.iccProfileName) score += 5;
+  if (metadata.fileFormat.colorProfile === 'sRGB') score += 5;
+  
   return Math.max(0, Math.min(100, score));
+};
+
+/**
+ * Applies orientation correction to image data
+ */
+export const applyOrientationCorrection = (
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  orientation?: number
+): void => {
+  if (!orientation || orientation === 1) return; // No correction needed
+  
+  const { width, height } = canvas;
+  
+  switch (orientation) {
+    case 2:
+      // Flip horizontal
+      ctx.scale(-1, 1);
+      ctx.translate(-width, 0);
+      break;
+    case 3:
+      // Rotate 180°
+      ctx.rotate(Math.PI);
+      ctx.translate(-width, -height);
+      break;
+    case 4:
+      // Flip vertical
+      ctx.scale(1, -1);
+      ctx.translate(0, -height);
+      break;
+    case 5:
+      // Rotate 90° CCW + flip horizontal
+      ctx.rotate(-Math.PI / 2);
+      ctx.scale(-1, 1);
+      ctx.translate(-height, -width);
+      break;
+    case 6:
+      // Rotate 90° CW
+      ctx.rotate(Math.PI / 2);
+      ctx.translate(0, -height);
+      break;
+    case 7:
+      // Rotate 90° CW + flip horizontal
+      ctx.rotate(Math.PI / 2);
+      ctx.scale(-1, 1);
+      ctx.translate(-width, -height);
+      break;
+    case 8:
+      // Rotate 90° CCW
+      ctx.rotate(-Math.PI / 2);
+      ctx.translate(-width, 0);
+      break;
+  }
 };
