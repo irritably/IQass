@@ -184,7 +184,8 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
                   <span className="text-gray-600">Histogram Balance:</span>
                   <span className={`font-medium ${
                     exposureAnalysis.histogramBalance === 'balanced' ? 'text-green-600' : 
-                    exposureAnalysis.histogramBalance === 'high-contrast' ? 'text-blue-600' : 'text-yellow-600'
+                    exposureAnalysis.histogramBalance === 'high-contrast' ? 'text-blue-600' : 
+                    exposureAnalysis.histogramBalance === 'low-contrast' ? 'text-purple-600' : 'text-yellow-600'
                   }`}>
                     {exposureAnalysis.histogramBalance.replace('-', ' ')}
                   </span>
@@ -309,7 +310,7 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
           </CollapsibleSection>
         )}
 
-        {/* Noise & Artifacts */}
+        {/* Enhanced Noise & Artifacts */}
         <CollapsibleSection
           title="Noise & Artifacts"
           icon={<Zap className="w-5 h-5 text-purple-600" />}
@@ -319,48 +320,72 @@ export const TechnicalQualityPanel: React.FC<TechnicalQualityPanelProps> = ({ an
           badgeColor={`${getScoreColor(noiseAnalysis.noiseScore).replace('text-', 'bg-').replace('-600', '-100')} ${getScoreColor(noiseAnalysis.noiseScore).replace('-600', '-800')}`}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Noise Level:</span>
-                <span className={`font-medium ${noiseAnalysis.noiseLevel < 10 ? 'text-green-600' : 
-                  noiseAnalysis.noiseLevel < 20 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {noiseAnalysis.noiseLevel.toFixed(1)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">SNR Ratio:</span>
-                <span className="font-medium">{noiseAnalysis.snrRatio.toFixed(1)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Compression Artifacts:</span>
-                <span className={`font-medium ${noiseAnalysis.compressionArtifacts < 5 ? 'text-green-600' : 
-                  noiseAnalysis.compressionArtifacts < 15 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {noiseAnalysis.compressionArtifacts.toFixed(1)}
-                </span>
+            <div className="space-y-3">
+              <h5 className="font-medium text-gray-900">Noise Measurements</h5>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Raw Std Deviation (σ):</span>
+                  <span className="font-medium">{noiseAnalysis.rawStandardDeviation.toFixed(3)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Noise Level:</span>
+                  <span className={`font-medium ${noiseAnalysis.noiseLevel < 10 ? 'text-green-600' : 
+                    noiseAnalysis.noiseLevel < 25 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {noiseAnalysis.noiseLevel.toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">SNR Ratio:</span>
+                  <span className={`font-medium ${noiseAnalysis.snrRatio > 20 ? 'text-green-600' : 
+                    noiseAnalysis.snrRatio > 10 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {noiseAnalysis.snrRatio.toFixed(1)}
+                  </span>
+                </div>
               </div>
             </div>
             
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Chromatic Aberration:</span>
-                <span className={`font-medium ${noiseAnalysis.chromaticAberration < 5 ? 'text-green-600' : 
-                  noiseAnalysis.chromaticAberration < 15 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {noiseAnalysis.chromaticAberration.toFixed(1)}
-                </span>
+            <div className="space-y-3">
+              <h5 className="font-medium text-gray-900">Artifact Detection</h5>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Compression Artifacts:</span>
+                  <span className={`font-medium ${noiseAnalysis.compressionArtifacts < 10 ? 'text-green-600' : 
+                    noiseAnalysis.compressionArtifacts < 25 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {noiseAnalysis.compressionArtifacts.toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Chromatic Aberration:</span>
+                  <span className={`font-medium ${noiseAnalysis.chromaticAberration < 5 ? 'text-green-600' : 
+                    noiseAnalysis.chromaticAberration < 15 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {noiseAnalysis.chromaticAberration.toFixed(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Vignetting:</span>
+                  <span className={`font-medium ${noiseAnalysis.vignetting < 10 ? 'text-green-600' : 
+                    noiseAnalysis.vignetting < 25 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {noiseAnalysis.vignetting.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Overall Artifact Score:</span>
+                  <span className={`font-medium ${getScoreColor(100 - noiseAnalysis.overallArtifactScore)}`}>
+                    {noiseAnalysis.overallArtifactScore}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Vignetting:</span>
-                <span className={`font-medium ${noiseAnalysis.vignetting < 10 ? 'text-green-600' : 
-                  noiseAnalysis.vignetting < 25 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {noiseAnalysis.vignetting.toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Overall Artifact Score:</span>
-                <span className={`font-medium ${getScoreColor(100 - noiseAnalysis.overallArtifactScore)}`}>
-                  {noiseAnalysis.overallArtifactScore}
-                </span>
-              </div>
+            </div>
+          </div>
+
+          {/* Noise Analysis Explanation */}
+          <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+            <h6 className="font-medium text-purple-900 mb-2">Understanding Noise Metrics</h6>
+            <div className="text-sm text-purple-800 space-y-1">
+              <p><strong>Raw Standard Deviation (σ):</strong> Direct measurement of pixel value variation</p>
+              <p><strong>Noise Level:</strong> User-friendly 0-100 scale derived from σ (lower is better)</p>
+              <p><strong>SNR Ratio:</strong> Signal-to-noise ratio (higher is better, >20 is excellent)</p>
+              <p><strong>Artifacts:</strong> Specific image quality issues (lower percentages are better)</p>
             </div>
           </div>
         </CollapsibleSection>

@@ -83,7 +83,8 @@ const calculateRawStandardDeviation = (data: Uint8ClampedArray, width: number, h
 const deriveNoiseLevel = (rawStdDev: number): number => {
   // Convert raw standard deviation to 0-100 scale
   // Empirically determined scaling based on typical image noise levels
-  return Math.min(100, (rawStdDev / 25) * 100);
+  // Good images typically have σ < 5, noisy images have σ > 15
+  return Math.min(100, Math.max(0, (rawStdDev / 20) * 100));
 };
 
 /**
@@ -108,6 +109,7 @@ const deriveSNR = (data: Uint8ClampedArray, rawStdDev: number): number => {
 const detectCompressionArtifacts = (data: Uint8ClampedArray, width: number, height: number): number => {
   // Simplified JPEG blocking artifact detection
   let blockingScore = 0;
+  let edgeCount = 0;
   const blockSize = 8;
   
   // Check for 8x8 block boundaries (typical JPEG compression)
@@ -116,16 +118,35 @@ const detectCompressionArtifacts = (data: Uint8ClampedArray, width: number, heig
       const idx1 = ((y - 1) * width + x) * 4;
       const idx2 = (y * width + x) * 4;
       
-      const diff = Math.abs(
-        (0.299 * data[idx1] + 0.587 * data[idx1 + 1] + 0.114 * data[idx1 + 2]) -
-        (0.299 * data[idx2] + 0.587 * data[idx2 + 1] + 0.114 * data[idx2 + 2])
-      );
+      const lum1 = 0.299 * data[idx1] + 0.587 * data[idx1 + 1] + 0.114 * data[idx1 + 2];
+      const lum2 = 0.299 * data[idx2] + 0.587 * data[idx2 + 1] + 0.114 * data[idx2 + 2];
       
+      const diff = Math.abs(lum1 - lum2);
       blockingScore += diff;
+      edgeCount++;
     }
   }
   
-  return Math.min(blockingScore / (width * height / 64), 100);
+  // Check vertical block boundaries
+  for (let x = blockSize; x < width - blockSize; x += blockSize) {
+    for (let y = 0; y < height; y++) {
+      const idx1 = (y * width + (x - 1)) * 4;
+      const idx2 = (y * width + x) * 4;
+      
+      const lum1 = 0.299 * data[idx1] + 0.587 * data[idx1 + 1] + 0.114 * data[idx1 + 2];
+      const lum2 = 0.299 * data[idx2] + 0.587 * data[idx2 + 1] + 0.114 * data[idx2 + 2];
+      
+      const diff = Math.abs(lum1 - lum2);
+      blockingScore += diff;
+      edgeCount++;
+    }
+  }
+  
+  if (edgeCount === 0) return 0;
+  
+  // Normalize to 0-100 scale
+  const avgBlockingScore = blockingScore / edgeCount;
+  return Math.min(100, Math.max(0, (avgBlockingScore / 10) * 100));
 };
 
 const detectChromaticAberration = (data: Uint8ClampedArray, width: number, height: number): number => {
@@ -137,7 +158,7 @@ const detectChromaticAberration = (data: Uint8ClampedArray, width: number, heigh
     for (let x = 1; x < width - 1; x++) {
       const idx = (y * width + x) * 4;
       
-      // Calculate edge strength
+      // Calculate edge strength for each channel
       const r = data[idx];
       const g = data[idx + 1];
       const b = data[idx + 2];
@@ -150,29 +171,34 @@ const detectChromaticAberration = (data: Uint8ClampedArray, width: number, heigh
       const gEdge = Math.abs(g - gNext);
       const bEdge = Math.abs(b - bNext);
       
-      if (rEdge > 20 || gEdge > 20 || bEdge > 20) {
+      // Only analyze significant edges
+      const maxEdge = Math.max(rEdge, gEdge, bEdge);
+      if (maxEdge > 20) {
         // Check for color channel imbalance at edges
         const channelImbalance = Math.abs(rEdge - gEdge) + Math.abs(gEdge - bEdge) + Math.abs(bEdge - rEdge);
-        aberrationScore += channelImbalance;
+        aberrationScore += channelImbalance / maxEdge; // Normalize by edge strength
         edgeCount++;
       }
     }
   }
   
-  return edgeCount > 0 ? Math.min(aberrationScore / edgeCount / 10, 100) : 0;
+  if (edgeCount === 0) return 0;
+  
+  // Normalize to 0-100 scale
+  const avgAberration = aberrationScore / edgeCount;
+  return Math.min(100, Math.max(0, avgAberration * 10));
 };
 
 const detectVignetting = (data: Uint8ClampedArray, width: number, height: number): number => {
   const centerX = width / 2;
   const centerY = height / 2;
-  const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
   
   let centerBrightness = 0;
   let cornerBrightness = 0;
   let centerCount = 0;
   let cornerCount = 0;
   
-  // Sample center region
+  // Sample center region (10% of image size)
   const centerRadius = Math.min(width, height) * 0.1;
   for (let y = Math.floor(centerY - centerRadius); y < centerY + centerRadius; y++) {
     for (let x = Math.floor(centerX - centerRadius); x < centerX + centerRadius; x++) {
@@ -185,7 +211,7 @@ const detectVignetting = (data: Uint8ClampedArray, width: number, height: number
     }
   }
   
-  // Sample corner regions
+  // Sample corner regions (5% of image size each)
   const cornerRadius = Math.min(width, height) * 0.05;
   const corners = [
     [cornerRadius, cornerRadius],
@@ -207,11 +233,14 @@ const detectVignetting = (data: Uint8ClampedArray, width: number, height: number
     }
   });
   
-  const avgCenterBrightness = centerCount > 0 ? centerBrightness / centerCount : 0;
-  const avgCornerBrightness = cornerCount > 0 ? cornerBrightness / cornerCount : 0;
+  if (centerCount === 0 || cornerCount === 0) return 0;
   
+  const avgCenterBrightness = centerBrightness / centerCount;
+  const avgCornerBrightness = cornerBrightness / cornerCount;
+  
+  // Calculate vignetting as percentage brightness difference
   const vignettingRatio = avgCenterBrightness > 0 ? 
-    (avgCenterBrightness - avgCornerBrightness) / avgCenterBrightness : 0;
+    Math.max(0, (avgCenterBrightness - avgCornerBrightness) / avgCenterBrightness) : 0;
   
-  return Math.max(0, Math.min(100, vignettingRatio * 100));
+  return Math.min(100, vignettingRatio * 100);
 };
