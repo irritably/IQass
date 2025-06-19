@@ -4,9 +4,17 @@ import { DashboardSidebar } from './DashboardSidebar';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  onSaveSession?: () => void;
+  onLoadSession?: () => void;
+  hasData?: boolean;
 }
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ 
+  children, 
+  onSaveSession,
+  onLoadSession,
+  hasData = false
+}) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('upload');
 
@@ -20,6 +28,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       <DashboardHeader 
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
         sidebarCollapsed={sidebarCollapsed}
+        onSaveSession={onSaveSession}
+        onLoadSession={onLoadSession}
+        hasData={hasData}
       />
       
       <div className="flex">

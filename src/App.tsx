@@ -7,9 +7,12 @@ import { ModernStatsOverview } from './components/Dashboard/ModernStatsOverview'
 import { ImageGrid } from './components/ImageGrid';
 import { QualityHistogram } from './components/QualityHistogram';
 import { ReportExport } from './components/ReportExport';
-import { ImageAnalysis, ProcessingProgress, AnalysisStats, ProcessingStep } from './types';
+import { SessionSaveModal } from './components/SessionManager/SessionSaveModal';
+import { SessionLoadModal } from './components/SessionManager/SessionLoadModal';
+import { ImageAnalysis, ProcessingProgress, AnalysisStats, ProcessingStep, MissionMetadata } from './types';
 import { analyzeImage } from './utils/imageAnalysis';
 import { calculateQualityStatistics } from './utils/qualityAssessment';
+import { SessionData, convertToSessionAnalysis } from './utils/sessionManager';
 
 function App() {
   const [analyses, setAnalyses] = useState<ImageAnalysis[]>([]);
@@ -19,6 +22,12 @@ function App() {
     isProcessing: false
   });
   const [threshold, setThreshold] = useState(70);
+  const [missionData, setMissionData] = useState<MissionMetadata>();
+  
+  // Session management state
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [sessionSaveSuccess, setSessionSaveSuccess] = useState<string | null>(null);
 
   const calculateStats = useCallback((analyses: ImageAnalysis[]): AnalysisStats => {
     const baseStats = calculateQualityStatistics(analyses, threshold);
@@ -115,11 +124,58 @@ function App() {
     }));
   }, []);
 
+  // Session management handlers
+  const handleSaveSession = useCallback(() => {
+    if (analyses.length > 0) {
+      setShowSaveModal(true);
+    }
+  }, [analyses]);
+
+  const handleLoadSession = useCallback(() => {
+    setShowLoadModal(true);
+  }, []);
+
+  const handleSaveSuccess = useCallback((sessionId: string) => {
+    setSessionSaveSuccess(sessionId);
+    setTimeout(() => setSessionSaveSuccess(null), 3000);
+  }, []);
+
+  const handleLoadSessionData = useCallback((sessionData: SessionData) => {
+    // Convert session analyses back to ImageAnalysis format
+    // Note: File objects cannot be restored, so these will be view-only
+    const restoredAnalyses: ImageAnalysis[] = sessionData.analyses.map(sessionAnalysis => ({
+      ...sessionAnalysis,
+      file: new File([], sessionAnalysis.name), // Placeholder file
+    }));
+
+    setAnalyses(restoredAnalyses);
+    setThreshold(sessionData.threshold);
+    setMissionData(sessionData.missionData);
+    
+    // Show success message
+    alert(`Session "${sessionData.name}" loaded successfully!\n\nNote: Original files are not available, but all analysis data has been restored.`);
+  }, []);
+
   const stats = calculateStats(analyses);
+  const hasData = analyses.length > 0;
 
   return (
-    <DashboardLayout>
+    <DashboardLayout 
+      onSaveSession={handleSaveSession}
+      onLoadSession={handleLoadSession}
+      hasData={hasData}
+    >
       <div className="space-y-8">
+        {/* Session Save Success Message */}
+        {sessionSaveSuccess && (
+          <div className="fixed top-20 right-6 z-50 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-lg backdrop-blur-sm animate-fade-in-up">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+              <span className="text-emerald-200 font-medium">Session saved successfully!</span>
+            </div>
+          </div>
+        )}
+
         {/* Upload Section */}
         <div id="upload-section" className="animate-fade-in-up">
           <ModernFileUpload 
@@ -167,6 +223,22 @@ function App() {
           <ReportExport analyses={analyses} threshold={threshold} />
         </div>
       </div>
+
+      {/* Session Management Modals */}
+      <SessionSaveModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        analyses={analyses}
+        threshold={threshold}
+        missionData={missionData}
+        onSaveSuccess={handleSaveSuccess}
+      />
+
+      <SessionLoadModal
+        isOpen={showLoadModal}
+        onClose={() => setShowLoadModal(false)}
+        onLoadSession={handleLoadSessionData}
+      />
     </DashboardLayout>
   );
 }
