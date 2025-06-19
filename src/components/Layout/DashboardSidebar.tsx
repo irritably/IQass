@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Home,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Layers
 } from 'lucide-react';
 
 interface DashboardSidebarProps {
@@ -105,7 +106,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     const hasChildren = item.children && item.children.length > 0;
 
     return (
-      <div key={item.id}>
+      <div key={item.id} className="animate-fade-in-up" style={{ animationDelay: `${level * 0.1}s` }}>
         <button
           onClick={() => {
             if (hasChildren) {
@@ -114,31 +115,33 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               item.onClick();
             }
           }}
-          className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 group ${
+          className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-300 group ${
             isActive 
-              ? 'bg-blue-600 text-white shadow-lg glow-blue' 
-              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+              ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg glow-blue' 
+              : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
           } ${level > 0 ? 'ml-4 pl-8' : ''}`}
         >
           <div className="flex items-center space-x-3">
-            <div className={`transition-colors ${isActive ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}`}>
+            <div className={`transition-all duration-300 ${
+              isActive ? 'text-white scale-110' : 'text-slate-400 group-hover:text-slate-200 group-hover:scale-105'
+            }`}>
               {item.icon}
             </div>
             {!collapsed && (
-              <span className="font-medium">{item.label}</span>
+              <span className="font-semibold">{item.label}</span>
             )}
           </div>
           
           {!collapsed && (
             <div className="flex items-center space-x-2">
               {item.badge && (
-                <span className="px-2 py-1 text-xs bg-blue-500 text-white rounded-full">
+                <span className="badge-primary">
                   {item.badge}
                 </span>
               )}
               {hasChildren && (
                 <ChevronRight 
-                  className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                  className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} 
                 />
               )}
             </div>
@@ -147,7 +150,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
         {/* Children */}
         {hasChildren && isExpanded && !collapsed && (
-          <div className="mt-1 space-y-1">
+          <div className="mt-2 space-y-1 animate-fade-in-up">
             {item.children!.map(child => renderSidebarItem(child, level + 1))}
           </div>
         )}
@@ -156,7 +159,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   };
 
   return (
-    <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-gray-800 border-r border-gray-700 transition-all duration-300 z-40 ${
+    <aside className={`fixed left-0 top-16 h-[calc(100vh-4rem)] bg-slate-800/95 backdrop-blur-sm border-r border-slate-700/50 transition-all duration-300 z-40 ${
       collapsed ? 'w-16' : 'w-64'
     }`}>
       <div className="p-4 h-full overflow-y-auto">
@@ -166,15 +169,19 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
         {/* Bottom Section */}
         {!collapsed && (
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="p-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-lg border border-blue-500/30">
+          <div className="absolute bottom-4 left-4 right-4 animate-fade-in-up delay-500">
+            <div className="p-4 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-xl border border-blue-500/30 backdrop-blur-sm">
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Zap className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-200">GPU Accelerated</p>
-                  <p className="text-xs text-gray-400">WebGL Processing Active</p>
+                  <p className="text-sm font-semibold text-blue-200">GPU Accelerated</p>
+                  <p className="text-xs text-blue-300">WebGL Processing Active</p>
+                  <div className="flex items-center space-x-1 mt-1">
+                    <div className="status-online" />
+                    <span className="text-xs text-emerald-400 font-medium">Ready</span>
+                  </div>
                 </div>
               </div>
             </div>
