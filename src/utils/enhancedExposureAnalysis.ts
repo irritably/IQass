@@ -92,15 +92,15 @@ const calculateBasicExposureMetrics = (luminance: Float32Array, width: number, h
   // Calculate average brightness
   const averageBrightness = luminanceValues.reduce((sum, val) => sum + val, 0) / luminanceValues.length;
   
-  // Calculate dynamic range
-  const sortedLuminance = [...luminanceValues].sort((a, b) => a - b);
+  // Calculate dynamic range using efficient sorting
+  const sortedLuminance = luminanceValues.slice().sort((a, b) => a - b);
   const p5 = sortedLuminance[Math.floor(sortedLuminance.length * 0.05)];
   const p95 = sortedLuminance[Math.floor(sortedLuminance.length * 0.95)];
   const dynamicRange = p95 - p5;
   
   // Calculate contrast ratio
-  const maxLuminance = Math.max(...luminanceValues);
-  const minLuminance = Math.min(...luminanceValues);
+  const maxLuminance = sortedLuminance[sortedLuminance.length - 1];
+  const minLuminance = sortedLuminance[0];
   const contrastRatio = maxLuminance > 0 ? (maxLuminance + 0.05) / (minLuminance + 0.05) : 1;
   
   // Determine histogram balance (now includes low-contrast)
