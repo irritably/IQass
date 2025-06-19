@@ -1,5 +1,7 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { Upload, Image as ImageIcon, AlertCircle, X, FolderOpen, FileImage } from 'lucide-react';
+import { FileValidationResult, FileValidationError } from '../types';
+import { getFileSizeLimit } from '../utils/config';
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -10,7 +12,7 @@ interface FilePreview {
   file: File;
   id: string;
   preview?: string;
-  error?: string;
+  validation: FileValidationResult;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProcessing }) => {
@@ -18,34 +20,66 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = (file: File): FileValidationResult => {
+    const errors: FileValidationError[] = [];
+    const warnings: string[] = [];
+    
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/tiff', 'image/tif'];
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = getFileSizeLimit(file.type);
 
+    // Check file type
     if (!validTypes.includes(file.type.toLowerCase())) {
-      return 'Invalid file type. Please use JPG, PNG, or TIFF files.';
+      errors.push({
+        type: 'format',
+        message: 'Invalid file type. Please use JPG, PNG, or TIFF files.'
+      });
     }
+
+    // Check file size with format-specific limits
     if (file.size > maxSize) {
-      return 'File too large. Maximum size is 50MB.';
+      const sizeMB = (maxSize / 1024 / 1024).toFixed(0);
+      errors.push({
+        type: 'size',
+        message: `File too large. Maximum size for ${file.type} is ${sizeMB}MB.`
+      });
     }
-    return null;
+
+    // Add warnings for very large TIFF files
+    if (file.type.toLowerCase().includes('tiff') && file.size > 100 * 1024 * 1024) {
+      warnings.push('Large TIFF files will be down-sampled for analysis to ensure performance.');
+    }
+
+    // Basic corruption check (very basic - just check if file has content)
+    if (file.size === 0) {
+      errors.push({
+        type: 'corruption',
+        message: 'File appears to be empty or corrupted.'
+      });
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings
+    };
   };
 
   const createFilePreview = async (file: File): Promise<FilePreview> => {
     const id = Math.random().toString(36).substr(2, 9);
-    const error = validateFile(file);
+    const validation = validateFile(file);
     
-    if (error) {
-      return { file, id, error };
+    if (!validation.isValid) {
+      return { file, id, validation };
     }
 
     try {
       const preview = await createThumbnail(file);
-      return { file, id, preview };
+      return { file, id, preview, validation };
     } catch (err) {
       console.warn('Failed to create thumbnail for', file.name, err);
-      // Don't treat thumbnail failure as an error - file can still be processed
-      return { file, id };
+      // Add warning but don't mark as invalid
+      validation.warnings.push('Could not generate preview thumbnail');
+      return { file, id, validation };
     }
   };
 
@@ -198,7 +232,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
 
   const startProcessing = useCallback(() => {
     const validFiles = selectedFiles
-      .filter(fp => !fp.error)
+      .filter(fp => fp.validation.isValid)
       .map(fp => fp.file);
     
     if (validFiles.length > 0) {
@@ -207,8 +241,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
     }
   }, [selectedFiles, onFilesSelected]);
 
-  const validFileCount = selectedFiles.filter(fp => !fp.error).length;
-  const errorFileCount = selectedFiles.filter(fp => fp.error).length;
+  const validFileCount = selectedFiles.filter(fp => fp.validation.isValid).length;
+  const errorFileCount = selectedFiles.filter(fp => !fp.validation.isValid).length;
+  const warningFileCount = selectedFiles.filter(fp => fp.validation.warnings.length > 0).length;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -281,9 +316,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
           )}
 
           <div className="flex items-center space-x-6 text-sm text-gray-500">
-            <span>Supports JPG, PNG, TIFF</span>
+            <span>JPG, PNG, TIFF</span>
             <span>•</span>
-            <span>Max 50MB per file</span>
+            <span>Smart size limits</span>
             <span>•</span>
             <span>Batch processing</span>
           </div>
@@ -306,6 +341,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
               {errorFileCount > 0 && (
                 <span className="text-sm text-red-600">
                   {errorFileCount} with errors
+                </span>
+              )}
+              {warningFileCount > 0 && (
+                <span className="text-sm text-yellow-600">
+                  {warningFileCount} with warnings
                 </span>
               )}
             </div>
@@ -334,8 +374,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
               <div
                 key={filePreview.id}
                 className={`relative group border-2 rounded-lg p-2 transition-colors ${
-                  filePreview.error 
+                  !filePreview.validation.isValid
                     ? 'border-red-200 bg-red-50' 
+                    : filePreview.validation.warnings.length > 0
+                    ? 'border-yellow-200 bg-yellow-50'
                     : 'border-gray-200 bg-gray-50 hover:border-blue-300'
                 }`}
               >
@@ -369,11 +411,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
                   <p className="text-xs text-gray-500">
                     {(filePreview.file.size / 1024 / 1024).toFixed(1)} MB
                   </p>
-                  {filePreview.error && (
-                    <p className="text-xs text-red-600 truncate" title={filePreview.error}>
-                      {filePreview.error}
+                  
+                  {/* Display errors */}
+                  {filePreview.validation.errors.map((error, index) => (
+                    <p key={index} className="text-xs text-red-600 truncate" title={error.message}>
+                      {error.message}
                     </p>
-                  )}
+                  ))}
+                  
+                  {/* Display warnings */}
+                  {filePreview.validation.warnings.map((warning, index) => (
+                    <p key={index} className="text-xs text-yellow-600 truncate" title={warning}>
+                      {warning}
+                    </p>
+                  ))}
                 </div>
               </div>
             ))}
@@ -381,7 +432,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
         </div>
       )}
 
-      {/* Help Text */}
+      {/* Enhanced Help Text */}
       {selectedFiles.length === 0 && !isProcessing && (
         <div className="mt-6 flex items-start space-x-2 text-sm text-amber-600 bg-amber-50 p-4 rounded-lg">
           <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
@@ -391,7 +442,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected, isProce
               <li>• Upload high-resolution drone photos for accurate analysis</li>
               <li>• Ensure images are properly exposed and in focus</li>
               <li>• Include EXIF metadata for enhanced quality assessment</li>
-              <li>• Process similar images together for consistent thresholds</li>
+              <li>• TIFF files support up to 200MB, JPEG/PNG up to 50-100MB</li>
+              <li>• Large files will be intelligently down-sampled for performance</li>
             </ul>
           </div>
         </div>

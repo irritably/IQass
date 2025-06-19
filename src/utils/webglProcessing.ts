@@ -2,8 +2,11 @@
  * Enhanced WebGL-based Image Processing Utilities
  * 
  * This module provides GPU-accelerated image processing operations using WebGL shaders
- * with context pooling, performance benchmarking, and precision optimization.
+ * with context pooling, performance benchmarking, and comprehensive visualization support.
  */
+
+import { WebGLCapabilities, PerformanceBenchmark } from '../types';
+import { WEBGL_CONFIG } from './config';
 
 interface WebGLContext {
   gl: WebGLRenderingContext | WebGL2RenderingContext;
@@ -13,33 +16,11 @@ interface WebGLContext {
   cleanup: () => void;
 }
 
-interface PerformanceBenchmark {
-  operation: string;
-  cpuTime: number;
-  gpuTime: number;
-  imageSize: number;
-  speedup: number;
-  timestamp: number;
-}
-
-interface WebGLCapabilities {
-  webgl: boolean;
-  webgl2: boolean;
-  maxTextureSize: number;
-  maxViewportDims: [number, number];
-  extensions: string[];
-  supportsHighPrecision: boolean;
-  supportsFloatTextures: boolean;
-}
-
 // Global context pool
 const contextPool: WebGLContext[] = [];
-const MAX_POOL_SIZE = 3;
-const CONTEXT_TIMEOUT = 30000; // 30 seconds
 
 // Performance tracking
 const performanceBenchmarks: PerformanceBenchmark[] = [];
-const MAX_BENCHMARKS = 100;
 
 /**
  * Vertex shader source code (standard for image processing)
@@ -86,7 +67,7 @@ const getLaplacianFragmentShader = (useHighPrecision: boolean = false) => `
 `;
 
 /**
- * Fragment shader for Harris corner detection with high precision
+ * FIXED Fragment shader for Harris corner detection with proper scaling
  */
 const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
   precision ${useHighPrecision ? 'highp' : 'mediump'} float;
@@ -98,34 +79,268 @@ const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
   void main() {
     vec2 onePixel = vec2(1.0) / u_textureSize;
     
-    // Calculate gradients with higher precision
-    float Ix = (
-      texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).r -
-      texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).r
-    ) * 0.5;
+    // Convert to grayscale first
+    vec4 centerColor = texture2D(u_image, v_texCoord);
+    float centerGray = dot(centerColor.rgb, vec3(0.299, 0.587, 0.114));
     
-    float Iy = (
-      texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).r -
-      texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).r
-    ) * 0.5;
+    // Calculate gradients with higher precision using grayscale
+    float rightGray = dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+    float leftGray = dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+    float topGray = dot(texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114));
+    float bottomGray = dot(texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114));
     
-    // Harris matrix elements with Gaussian-like weighting
-    float weight = 1.0; // Could be enhanced with actual Gaussian
-    float Ixx = Ix * Ix * weight;
-    float Iyy = Iy * Iy * weight;
-    float Ixy = Ix * Iy * weight;
+    float Ix = (rightGray - leftGray) * 0.5;
+    float Iy = (bottomGray - topGray) * 0.5;
     
-    // Harris response with higher precision
-    float det = Ixx * Iyy - Ixy * Ixy;
-    float trace = Ixx + Iyy;
+    // Harris matrix elements with proper scaling
+    float Ixx = Ix * Ix;
+    float Iyy = Iy * Iy;
+    float Ixy = Ix * Iy;
+    
+    // Apply Gaussian-like weighting in a 3x3 window
+    float totalWeight = 0.0;
+    float weightedIxx = 0.0;
+    float weightedIyy = 0.0;
+    float weightedIxy = 0.0;
+    
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        vec2 sampleCoord = v_texCoord + vec2(float(dx), float(dy)) * onePixel;
+        
+        // Gaussian weight (approximation)
+        float weight = 1.0;
+        if (dx == 0 && dy == 0) weight = 4.0;
+        else if (dx == 0 || dy == 0) weight = 2.0;
+        else weight = 1.0;
+        
+        // Sample gradients at this position
+        vec4 sampleColor = texture2D(u_image, sampleCoord);
+        float sampleGray = dot(sampleColor.rgb, vec3(0.299, 0.587, 0.114));
+        
+        float sampleIx = (dot(texture2D(u_image, sampleCoord + vec2(onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114)) - 
+                         dot(texture2D(u_image, sampleCoord + vec2(-onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114))) * 0.5;
+        float sampleIy = (dot(texture2D(u_image, sampleCoord + vec2(0.0, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) - 
+                         dot(texture2D(u_image, sampleCoord + vec2(0.0, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114))) * 0.5;
+        
+        weightedIxx += sampleIx * sampleIx * weight;
+        weightedIyy += sampleIy * sampleIy * weight;
+        weightedIxy += sampleIx * sampleIy * weight;
+        totalWeight += weight;
+      }
+    }
+    
+    // Normalize by total weight
+    weightedIxx /= totalWeight;
+    weightedIyy /= totalWeight;
+    weightedIxy /= totalWeight;
+    
+    // Harris response calculation
+    float det = weightedIxx * weightedIyy - weightedIxy * weightedIxy;
+    float trace = weightedIxx + weightedIyy;
     float response = det - u_k * trace * trace;
+    
+    // Enhanced scaling and normalization for better visibility
+    // Apply non-linear scaling to enhance corner responses
+    response = response * 10000.0; // Initial scaling
+    
+    // Apply threshold to reduce noise
+    if (response < 0.001) {
+      response = 0.0;
+    } else {
+      // Non-linear enhancement for positive responses
+      response = sqrt(response);
+      response = response * 0.5; // Final scaling
+    }
+    
+    // Clamp to valid range
+    response = clamp(response, 0.0, 1.0);
     
     gl_FragColor = vec4(response, response, response, 1.0);
   }
 `;
 
 /**
- * Enhanced WebGL capabilities detection
+ * Fragment shader for noise visualization - FIXED with constant loop bounds
+ */
+const getNoiseFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 onePixel = vec2(1.0) / u_textureSize;
+    vec2 blockCoord = floor(v_texCoord * u_textureSize / 8.0) * 8.0;
+    
+    // Calculate local variance in 8x8 block using FIXED loop bounds
+    float mean = 0.0;
+    float variance = 0.0;
+    float count = 0.0;
+    
+    // FIXED: Use constant loop bounds instead of variables
+    for (int y = 0; y < 8; y++) {
+      for (int x = 0; x < 8; x++) {
+        vec2 sampleCoord = (blockCoord + vec2(float(x), float(y))) / u_textureSize;
+        if (sampleCoord.x <= 1.0 && sampleCoord.y <= 1.0) {
+          vec4 color = texture2D(u_image, sampleCoord);
+          float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+          mean += luminance;
+          count += 1.0;
+        }
+      }
+    }
+    mean /= count;
+    
+    // Calculate variance with fixed loops
+    for (int y = 0; y < 8; y++) {
+      for (int x = 0; x < 8; x++) {
+        vec2 sampleCoord = (blockCoord + vec2(float(x), float(y))) / u_textureSize;
+        if (sampleCoord.x <= 1.0 && sampleCoord.y <= 1.0) {
+          vec4 color = texture2D(u_image, sampleCoord);
+          float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+          variance += (luminance - mean) * (luminance - mean);
+        }
+      }
+    }
+    variance /= count;
+    
+    float noise = sqrt(variance) * 5.0; // Scale for visibility
+    gl_FragColor = vec4(noise, noise, noise, 1.0);
+  }
+`;
+
+/**
+ * Fragment shader for compression artifact detection
+ */
+const getCompressionFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 onePixel = vec2(1.0) / u_textureSize;
+    
+    // Check if we're near a block boundary (8x8 JPEG blocks)
+    vec2 blockPos = mod(v_texCoord * u_textureSize, 8.0);
+    float boundaryDistance = min(min(blockPos.x, 8.0 - blockPos.x), 
+                                min(blockPos.y, 8.0 - blockPos.y));
+    
+    if (boundaryDistance < 1.0) {
+      // We're at a block boundary, check for discontinuity
+      vec4 center = texture2D(u_image, v_texCoord);
+      float centerLum = dot(center.rgb, vec3(0.299, 0.587, 0.114));
+      
+      // Sample neighboring pixels
+      vec4 left = texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0));
+      vec4 right = texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0));
+      vec4 up = texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y));
+      vec4 down = texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y));
+      
+      float leftLum = dot(left.rgb, vec3(0.299, 0.587, 0.114));
+      float rightLum = dot(right.rgb, vec3(0.299, 0.587, 0.114));
+      float upLum = dot(up.rgb, vec3(0.299, 0.587, 0.114));
+      float downLum = dot(down.rgb, vec3(0.299, 0.587, 0.114));
+      
+      // Calculate discontinuity
+      float maxDiff = max(max(abs(centerLum - leftLum), abs(centerLum - rightLum)),
+                         max(abs(centerLum - upLum), abs(centerLum - downLum)));
+      
+      // Scale for visibility
+      maxDiff = maxDiff * 3.0;
+      gl_FragColor = vec4(maxDiff, maxDiff, maxDiff, 1.0);
+    } else {
+      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+  }
+`;
+
+/**
+ * Fragment shader for chromatic aberration detection
+ */
+const getChromaticAberrationFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 onePixel = vec2(1.0) / u_textureSize;
+    
+    // Sobel edge detection on each channel
+    vec3 sobelX = vec3(0.0);
+    vec3 sobelY = vec3(0.0);
+    
+    // Sobel X kernel
+    sobelX += texture2D(u_image, v_texCoord + vec2(-onePixel.x, -onePixel.y)).rgb * -1.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb * -2.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(-onePixel.x, onePixel.y)).rgb * -1.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(onePixel.x, -onePixel.y)).rgb * 1.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb * 2.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(onePixel.x, onePixel.y)).rgb * 1.0;
+    
+    // Sobel Y kernel
+    sobelY += texture2D(u_image, v_texCoord + vec2(-onePixel.x, -onePixel.y)).rgb * -1.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).rgb * -2.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(onePixel.x, -onePixel.y)).rgb * -1.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(-onePixel.x, onePixel.y)).rgb * 1.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).rgb * 2.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(onePixel.x, onePixel.y)).rgb * 1.0;
+    
+    // Calculate gradient magnitudes for each channel
+    vec3 magnitude = sqrt(sobelX * sobelX + sobelY * sobelY);
+    
+    // Calculate channel differences
+    float rg_diff = abs(magnitude.r - magnitude.g);
+    float gb_diff = abs(magnitude.g - magnitude.b);
+    float rb_diff = abs(magnitude.r - magnitude.b);
+    
+    float aberration = (rg_diff + gb_diff + rb_diff) / 3.0;
+    aberration = aberration * 2.0; // Scale for visibility
+    
+    gl_FragColor = vec4(aberration, aberration, aberration, 1.0);
+  }
+`;
+
+/**
+ * Fragment shader for vignetting visualization
+ */
+const getVignettingFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 center = vec2(0.5, 0.5);
+    float distance = length(v_texCoord - center);
+    float maxDistance = length(vec2(0.5, 0.5));
+    
+    // Sample brightness at current position
+    vec4 color = texture2D(u_image, v_texCoord);
+    float brightness = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    
+    // Sample center brightness
+    vec4 centerColor = texture2D(u_image, center);
+    float centerBrightness = dot(centerColor.rgb, vec3(0.299, 0.587, 0.114));
+    
+    // Calculate expected brightness with simple radial model
+    float normalizedDistance = distance / maxDistance;
+    float expectedBrightness = centerBrightness * (1.0 - normalizedDistance * 0.3);
+    
+    // Calculate vignetting effect
+    float vignetting = 0.0;
+    if (centerBrightness > 0.1) {
+      vignetting = abs(brightness - expectedBrightness) / centerBrightness;
+      vignetting = vignetting * 3.0; // Scale for visibility
+    }
+    
+    gl_FragColor = vec4(vignetting, vignetting, vignetting, 1.0);
+  }
+`;
+
+/**
+ * Enhanced WebGL capabilities detection with browser/GPU info
  */
 export const getWebGLCapabilities = (): WebGLCapabilities => {
   const capabilities: WebGLCapabilities = {
@@ -159,11 +374,28 @@ export const getWebGLCapabilities = (): WebGLCapabilities => {
         'OES_texture_half_float',
         'WEBGL_color_buffer_float',
         'EXT_color_buffer_float',
-        'OES_standard_derivatives'
+        'OES_standard_derivatives',
+        'WEBGL_debug_renderer_info'
       ];
       
       capabilities.extensions = extensionNames.filter(ext => gl.getExtension(ext));
       capabilities.supportsFloatTextures = capabilities.extensions.includes('OES_texture_float');
+      
+      // Extract browser and GPU information
+      const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+      if (debugInfo) {
+        capabilities.browserInfo = {
+          userAgent: navigator.userAgent,
+          vendor: navigator.vendor,
+          renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+        };
+        
+        capabilities.gpuInfo = {
+          vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+          renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL),
+          version: gl.getParameter(gl.VERSION)
+        };
+      }
     }
   } catch (error) {
     console.warn('Error checking WebGL capabilities:', error);
@@ -173,7 +405,7 @@ export const getWebGLCapabilities = (): WebGLCapabilities => {
 };
 
 /**
- * Creates and compiles a shader with error handling
+ * Creates and compiles a shader with enhanced error handling
  */
 const createShader = (
   gl: WebGLRenderingContext | WebGL2RenderingContext,
@@ -236,7 +468,7 @@ const getWebGLContext = (width: number, height: number): WebGLContext | null => 
   // Clean up expired contexts
   const now = Date.now();
   for (let i = contextPool.length - 1; i >= 0; i--) {
-    if (now - contextPool[i].lastUsed > CONTEXT_TIMEOUT) {
+    if (now - contextPool[i].lastUsed > WEBGL_CONFIG.contextTimeout) {
       contextPool[i].cleanup();
       contextPool.splice(i, 1);
     }
@@ -251,7 +483,7 @@ const getWebGLContext = (width: number, height: number): WebGLContext | null => 
   }
 
   // Create new context if pool isn't full
-  if (contextPool.length < MAX_POOL_SIZE) {
+  if (contextPool.length < WEBGL_CONFIG.contextPoolSize) {
     const newContext = createWebGLContext(width, height);
     if (newContext) {
       contextPool.push(newContext);
@@ -332,9 +564,9 @@ const getProgram = (
 };
 
 /**
- * Performance benchmarking utility
+ * Performance benchmarking utility with enhanced error handling
  */
-const benchmarkOperation = async <T>(
+export const benchmarkOperation = async <T>(
   operation: string,
   cpuFunction: () => Promise<T> | T,
   gpuFunction: () => Promise<T> | T,
@@ -347,22 +579,37 @@ const benchmarkOperation = async <T>(
 
   // Benchmark GPU version
   const gpuStart = performance.now();
-  const gpuResult = await gpuFunction();
-  const gpuTime = performance.now() - gpuStart;
+  let gpuResult: T;
+  let gpuTime: number;
+  
+  try {
+    gpuResult = await gpuFunction();
+    gpuTime = performance.now() - gpuStart;
+  } catch (error) {
+    console.warn('GPU function failed, using CPU result:', error);
+    gpuResult = cpuResult;
+    gpuTime = cpuTime; // Use CPU time as fallback
+  }
 
-  const speedup = cpuTime / gpuTime;
+  // Prevent division by zero
+  const safeGpuTime = Math.max(gpuTime, 0.001); // Minimum 0.001ms
+  const speedup = cpuTime / safeGpuTime;
+  
+  const capabilities = getWebGLCapabilities();
   const benchmark: PerformanceBenchmark = {
     operation,
     cpuTime,
-    gpuTime,
+    gpuTime: safeGpuTime,
     imageSize,
     speedup,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    browserInfo: capabilities.browserInfo?.userAgent,
+    gpuInfo: capabilities.gpuInfo?.renderer
   };
 
   // Store benchmark (keep only recent ones)
   performanceBenchmarks.push(benchmark);
-  if (performanceBenchmarks.length > MAX_BENCHMARKS) {
+  if (performanceBenchmarks.length > WEBGL_CONFIG.benchmarkHistorySize) {
     performanceBenchmarks.shift();
   }
 
@@ -370,7 +617,7 @@ const benchmarkOperation = async <T>(
   if (process.env.NODE_ENV === 'development') {
     console.log(`Performance Benchmark - ${operation}:`, {
       cpuTime: `${cpuTime.toFixed(2)}ms`,
-      gpuTime: `${gpuTime.toFixed(2)}ms`,
+      gpuTime: `${safeGpuTime.toFixed(2)}ms`,
       speedup: `${speedup.toFixed(2)}x`,
       imageSize: `${imageSize} pixels`
     });
@@ -536,89 +783,11 @@ export const calculateBlurScoreWebGL = (imageData: ImageData): Promise<number> =
 };
 
 /**
- * Enhanced WebGL-accelerated Harris corner detection
- */
-export const detectCornersWebGL = (
-  imageData: ImageData,
-  k: number = 0.04
-): Promise<Float32Array> => {
-  return new Promise((resolve, reject) => {
-    const capabilities = getWebGLCapabilities();
-    if (!capabilities.webgl) {
-      reject(new Error('WebGL not supported'));
-      return;
-    }
-
-    const context = getWebGLContext(imageData.width, imageData.height);
-    if (!context) {
-      reject(new Error('Failed to get WebGL context'));
-      return;
-    }
-
-    const { gl } = context;
-
-    try {
-      const useHighPrecision = capabilities.supportsHighPrecision;
-      const fragmentShader = getHarrisFragmentShader(useHighPrecision);
-      const program = getProgram(context, 'harris', fragmentShader);
-      
-      if (!program) throw new Error('Failed to create shader program');
-
-      // Set up geometry
-      const buffer = setupGeometry(gl, program);
-      if (!buffer) throw new Error('Failed to setup geometry');
-
-      // Create texture from image data
-      const texture = createTextureFromImageData(gl, imageData);
-      if (!texture) throw new Error('Failed to create texture');
-
-      // Use the program
-      gl.useProgram(program);
-
-      // Set uniforms
-      const imageLocation = gl.getUniformLocation(program, 'u_image');
-      const textureSizeLocation = gl.getUniformLocation(program, 'u_textureSize');
-      const kLocation = gl.getUniformLocation(program, 'u_k');
-
-      gl.uniform1i(imageLocation, 0);
-      gl.uniform2f(textureSizeLocation, imageData.width, imageData.height);
-      gl.uniform1f(kLocation, k);
-
-      // Bind texture
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-
-      // Render
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-      // Read back the result
-      const pixels = new Uint8Array(imageData.width * imageData.height * 4);
-      gl.readPixels(0, 0, imageData.width, imageData.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-      // Convert to Float32Array (Harris response values)
-      const responses = new Float32Array(imageData.width * imageData.height);
-      for (let i = 0; i < responses.length; i++) {
-        // Normalize from 0-255 to appropriate range
-        responses[i] = (pixels[i * 4] / 255.0) * 2.0 - 1.0;
-      }
-
-      // Cleanup (but keep context in pool)
-      gl.deleteTexture(texture);
-      gl.deleteBuffer(buffer);
-
-      resolve(responses);
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-/**
- * Debug visualization utilities
+ * Enhanced debug visualization utilities with noise/artifact support
  */
 export const generateDebugVisualization = async (
   imageData: ImageData,
-  operation: 'laplacian' | 'sobel' | 'harris'
+  operation: 'laplacian' | 'harris' | 'noise' | 'compression' | 'aberration' | 'vignetting'
 ): Promise<ImageData | null> => {
   const capabilities = getWebGLCapabilities();
   if (!capabilities.webgl) return null;
@@ -640,6 +809,22 @@ export const generateDebugVisualization = async (
       case 'harris':
         fragmentShader = getHarrisFragmentShader(capabilities.supportsHighPrecision);
         programKey = 'harris_debug';
+        break;
+      case 'noise':
+        fragmentShader = getNoiseFragmentShader();
+        programKey = 'noise_debug';
+        break;
+      case 'compression':
+        fragmentShader = getCompressionFragmentShader();
+        programKey = 'compression_debug';
+        break;
+      case 'aberration':
+        fragmentShader = getChromaticAberrationFragmentShader();
+        programKey = 'aberration_debug';
+        break;
+      case 'vignetting':
+        fragmentShader = getVignettingFragmentShader();
+        programKey = 'vignetting_debug';
         break;
       default:
         return null;
@@ -710,14 +895,14 @@ export const shouldUseWebGL = (imageData: ImageData): boolean => {
   
   // Use performance history to make smarter decisions
   const stats = getPerformanceStats();
-  if (stats && stats.averageSpeedup < 1.5) {
+  if (stats && stats.averageSpeedup < WEBGL_CONFIG.speedupThreshold) {
     // If GPU isn't significantly faster, don't use it
     return false;
   }
   
   // Use WebGL for larger images where the performance benefit is significant
   const pixelCount = imageData.width * imageData.height;
-  const minPixelsForWebGL = stats && stats.averageSpeedup > 3 ? 50000 : 100000;
+  const minPixelsForWebGL = stats && stats.averageSpeedup > 3 ? 50000 : WEBGL_CONFIG.minPixelsForGPU;
   
   // Check if image fits within WebGL texture size limits
   const maxSize = capabilities.maxTextureSize;
@@ -739,8 +924,3 @@ export const cleanupWebGL = () => {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', cleanupWebGL);
 }
-
-/**
- * Export benchmarking utility for external use
- */
-export { benchmarkOperation };

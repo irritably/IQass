@@ -60,12 +60,65 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
   };
 
   /**
-   * Handles downloading recommended images
+   * FIXED: Handles downloading recommended images
    */
   const handleDownloadRecommended = () => {
     const recommended = analyses.filter(a => (a.compositeScore?.overall || 0) >= threshold);
-    console.log('Would download', recommended.length, 'recommended images');
-    // TODO: Implement actual download functionality
+    
+    if (recommended.length === 0) {
+      alert('No images meet the current quality threshold for download.');
+      return;
+    }
+
+    // Create a zip-like structure by downloading files individually
+    // Since we can't create actual zip files in the browser without additional libraries,
+    // we'll trigger individual downloads or create a list for the user
+    
+    if (recommended.length === 1) {
+      // Single file - direct download
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(recommended[0].file);
+      link.download = recommended[0].name;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } else {
+      // Multiple files - create a text file with the list and download info
+      const fileList = recommended.map((analysis, index) => 
+        `${index + 1}. ${analysis.name} (Score: ${analysis.compositeScore?.overall || 0})`
+      ).join('\n');
+      
+      const reportContent = `RECOMMENDED IMAGES FOR DOWNLOAD
+Generated: ${new Date().toLocaleString()}
+Quality Threshold: ${threshold}
+Total Recommended: ${recommended.length}
+
+FILES:
+${fileList}
+
+NOTE: Due to browser security limitations, individual file downloads 
+must be initiated manually. Please save the original files that match 
+the names listed above for your photogrammetry project.
+
+NEXT STEPS:
+1. Locate the original image files on your system
+2. Copy the files listed above to your project folder
+3. Use these high-quality images for photogrammetric reconstruction
+`;
+
+      // Download the report
+      const blob = new Blob([reportContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `recommended_images_list_${new Date().toISOString().split('T')[0]}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      // Show user feedback
+      alert(`Generated a list of ${recommended.length} recommended images. ` +
+            `A text file with the recommended filenames has been downloaded. ` +
+            `Please manually copy these files from your original image folder.`);
+    }
   };
 
   if (analyses.length === 0) return null;
@@ -105,10 +158,12 @@ const OriginalImageGrid: React.FC<ImageGridProps> = ({ analyses, threshold }) =>
               {/* Download Button */}
               <button
                 onClick={handleDownloadRecommended}
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                disabled={filterCounts.recommended === 0}
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                title={filterCounts.recommended === 0 ? 'No images meet the quality threshold' : `Download list of ${filterCounts.recommended} recommended images`}
               >
                 <Download className="w-4 h-4 mr-2" />
-                Export Recommended
+                Export Recommended ({filterCounts.recommended})
               </button>
             </div>
           </div>

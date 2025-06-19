@@ -1,20 +1,19 @@
-import { CompositeQualityScore } from '../types';
+import { CompositeQualityScore, QualityWeights } from '../types';
+import { DEFAULT_QUALITY_WEIGHTS, QUALITY_THRESHOLDS } from './config';
 
+/**
+ * Calculates composite quality score with configurable weights
+ */
 export const calculateCompositeScore = (
   blurScore: number,
   exposureScore: number,
   noiseScore: number,
   technicalScore: number,
-  descriptorScore: number = 0
+  descriptorScore: number = 0,
+  customWeights?: QualityWeights
 ): CompositeQualityScore => {
-  // Updated weighted scoring system with descriptor analysis
-  const weights = {
-    blur: 0.30,        // 30% - Still important but reduced
-    exposure: 0.25,    // 25% - Critical for image quality
-    noise: 0.20,       // 20% - Important for detail preservation
-    technical: 0.10,   // 10% - Reduced weight
-    descriptor: 0.15   // 15% - New photogrammetric-specific metric
-  };
+  // Use custom weights or default configuration
+  const weights = customWeights || DEFAULT_QUALITY_WEIGHTS;
   
   const overall = Math.round(
     blurScore * weights.blur +
@@ -24,12 +23,12 @@ export const calculateCompositeScore = (
     descriptorScore * weights.descriptor
   );
   
-  // Determine recommendation based on composite score with enhanced thresholds
+  // Determine recommendation based on composite score with configurable thresholds
   let recommendation: CompositeQualityScore['recommendation'];
-  if (overall >= 85) recommendation = 'excellent';
-  else if (overall >= 70) recommendation = 'good';
-  else if (overall >= 55) recommendation = 'acceptable';
-  else if (overall >= 40) recommendation = 'poor';
+  if (overall >= QUALITY_THRESHOLDS.excellent) recommendation = 'excellent';
+  else if (overall >= QUALITY_THRESHOLDS.good) recommendation = 'good';
+  else if (overall >= QUALITY_THRESHOLDS.acceptable) recommendation = 'acceptable';
+  else if (overall >= QUALITY_THRESHOLDS.poor) recommendation = 'poor';
   else recommendation = 'unsuitable';
   
   return {
@@ -61,10 +60,10 @@ export const getRecommendationColor = (recommendation: CompositeQualityScore['re
 };
 
 export const getScoreColor = (score: number): string => {
-  if (score >= 85) return 'text-green-600';
-  if (score >= 70) return 'text-blue-600';
-  if (score >= 55) return 'text-yellow-600';
-  if (score >= 40) return 'text-orange-600';
+  if (score >= QUALITY_THRESHOLDS.excellent) return 'text-green-600';
+  if (score >= QUALITY_THRESHOLDS.good) return 'text-blue-600';
+  if (score >= QUALITY_THRESHOLDS.acceptable) return 'text-yellow-600';
+  if (score >= QUALITY_THRESHOLDS.poor) return 'text-orange-600';
   return 'text-red-600';
 };
 

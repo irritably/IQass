@@ -1,10 +1,44 @@
 import React from 'react';
-import { ProcessingProgress } from '../types';
-import { Clock, Zap, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ProcessingProgress, ProcessingStep } from '../types';
+import { Clock, Zap, CheckCircle, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 
 interface ProgressBarProps {
   progress: ProcessingProgress;
 }
+
+const getStepName = (step: ProcessingStep): string => {
+  switch (step) {
+    case ProcessingStep.UPLOAD:
+      return 'Uploading files';
+    case ProcessingStep.EXTRACT:
+      return 'Extracting metadata';
+    case ProcessingStep.PROCESS:
+      return 'Processing image';
+    case ProcessingStep.ANALYZE:
+      return 'Analyzing quality';
+    case ProcessingStep.EXPORT:
+      return 'Finalizing results';
+    default:
+      return 'Processing';
+  }
+};
+
+const getStepDescription = (step: ProcessingStep): string => {
+  switch (step) {
+    case ProcessingStep.UPLOAD:
+      return 'Validating and preparing files';
+    case ProcessingStep.EXTRACT:
+      return 'Reading EXIF data and camera settings';
+    case ProcessingStep.PROCESS:
+      return 'Loading and preparing image data';
+    case ProcessingStep.ANALYZE:
+      return 'Running blur, exposure, noise, and feature analysis';
+    case ProcessingStep.EXPORT:
+      return 'Calculating composite scores and recommendations';
+    default:
+      return 'Processing image data';
+  }
+};
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   if (!progress.isProcessing && progress.current === 0) return null;
@@ -14,9 +48,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   
   // Calculate ETA based on processing speed
   const getETA = (): string => {
-    if (progress.current === 0 || !progress.isProcessing) return '';
+    if (progress.current === 0 || !progress.isProcessing || !progress.startTime) return '';
     
-    const elapsed = Date.now() - (progress.startTime || Date.now());
+    const elapsed = Date.now() - progress.startTime;
     const avgTimePerImage = elapsed / progress.current;
     const remaining = progress.total - progress.current;
     const etaMs = remaining * avgTimePerImage;
@@ -30,11 +64,25 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   };
 
   const getProcessingSpeed = (): string => {
-    if (progress.current === 0 || !progress.isProcessing) return '';
+    if (progress.current === 0 || !progress.isProcessing || !progress.startTime) return '';
     
-    const elapsed = Date.now() - (progress.startTime || Date.now());
+    const elapsed = Date.now() - progress.startTime;
     const speed = (progress.current / (elapsed / 1000)).toFixed(1);
     return `${speed} images/sec`;
+  };
+
+  const getCurrentStepName = (): string => {
+    if (progress.currentStep) {
+      return getStepName(progress.currentStep);
+    }
+    return progress.currentStepName || 'Processing';
+  };
+
+  const getCurrentStepDescription = (): string => {
+    if (progress.currentStep) {
+      return getStepDescription(progress.currentStep);
+    }
+    return 'Analyzing image quality metrics';
   };
 
   return (
@@ -149,7 +197,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
             {isComplete 
               ? 'Ready for review' 
               : progress.isProcessing 
-              ? 'Analyzing blur metrics...' 
+              ? getCurrentStepName()
               : 'Processing stopped'
             }
           </span>
@@ -158,29 +206,44 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
       
       {/* Detailed Progress for Current Image */}
       {progress.isProcessing && progress.currentImageName && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                Currently Processing:
-              </p>
-              <p className="text-sm text-blue-700 truncate max-w-md">
-                {progress.currentImageName}
-              </p>
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3">
+              <ImageIcon className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">
+                  Currently Processing:
+                </p>
+                <p className="text-sm text-blue-700 truncate max-w-md">
+                  {progress.currentImageName}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  {getCurrentStepDescription()}
+                </p>
+              </div>
             </div>
             <div className="text-right">
               <p className="text-xs text-blue-600">
                 Step {progress.currentStep || 1} of 5
               </p>
               <p className="text-xs text-blue-500">
-                {progress.currentStepName || 'Analyzing...'}
+                {getCurrentStepName()}
               </p>
+              {progress.imageDuration && (
+                <p className="text-xs text-blue-500">
+                  {(progress.imageDuration / 1000).toFixed(1)}s elapsed
+                </p>
+              )}
             </div>
           </div>
           
           {/* Sub-progress for current image */}
           {progress.currentImageProgress && (
-            <div className="mt-2">
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-blue-600 mb-1">
+                <span>Step Progress</span>
+                <span>{progress.currentImageProgress.toFixed(0)}%</span>
+              </div>
               <div className="w-full bg-blue-200 rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -194,12 +257,17 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
       
       {/* Success Message */}
       {isComplete && (
-        <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+        <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
           <div className="flex items-center space-x-2">
-            <CheckCircle className="w-4 h-4 text-green-600" />
-            <p className="text-sm text-green-800">
-              All images have been successfully analyzed. You can now review the results and export your data.
-            </p>
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Analysis Complete
+              </p>
+              <p className="text-sm text-green-700">
+                All images have been successfully analyzed. You can now review the results and export your data.
+              </p>
+            </div>
           </div>
         </div>
       )}
