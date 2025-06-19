@@ -15,9 +15,9 @@ import { analyzeDescriptors } from './descriptorAnalysis';
 import { getQualityLevel, generateQualityReport, exportQualityDataToCSV } from './qualityAssessment';
 
 /**
- * Performs comprehensive analysis of a single image file with enhanced error handling
+ * Performs comprehensive analysis of a single image file with enhanced progress tracking
  * @param file - The image file to analyze
- * @param onProgress - Optional progress callback
+ * @param onProgress - Optional progress callback with step and progress information
  * @returns Promise resolving to complete image analysis
  */
 export const analyzeImage = async (
@@ -34,9 +34,10 @@ export const analyzeImage = async (
     // Step 1: Extract metadata first (for orientation correction)
     let metadata;
     try {
+      onProgress?.(ProcessingStep.EXTRACT, 10);
       metadata = await extractMetadata(file);
       console.log(`Extracted metadata for ${file.name}`);
-      onProgress?.(ProcessingStep.EXTRACT, 50);
+      onProgress?.(ProcessingStep.EXTRACT, 100);
     } catch (metadataError) {
       console.warn(`Failed to extract metadata for ${file.name}:`, metadataError);
       metadata = {
@@ -45,6 +46,7 @@ export const analyzeImage = async (
         location: {},
         fileFormat: { format: 'Unknown' }
       };
+      onProgress?.(ProcessingStep.EXTRACT, 100);
     }
     
     // Step 2: Load and prepare image for analysis with orientation correction
@@ -57,7 +59,7 @@ export const analyzeImage = async (
       );
       imageData = loadedImageData;
       console.log(`Successfully loaded image data for ${file.name}`);
-      onProgress?.(ProcessingStep.PROCESS, 25);
+      onProgress?.(ProcessingStep.PROCESS, 50);
     } catch (loadError) {
       console.error(`Failed to load image ${file.name}:`, loadError);
       return createErrorAnalysis(file, `Failed to load image: ${loadError instanceof Error ? loadError.message : 'Unknown error'}`, analysisId, startTime);
@@ -68,13 +70,14 @@ export const analyzeImage = async (
     try {
       thumbnail = await createThumbnail(file);
       console.log(`Created thumbnail for ${file.name}`);
-      onProgress?.(ProcessingStep.PROCESS, 50);
+      onProgress?.(ProcessingStep.PROCESS, 100);
     } catch (thumbnailError) {
       console.warn(`Failed to create thumbnail for ${file.name}:`, thumbnailError);
+      onProgress?.(ProcessingStep.PROCESS, 100);
       // Continue without thumbnail - this is not a fatal error
     }
     
-    // Step 4: Perform core image analysis
+    // Step 4: Perform core image analysis with detailed progress
     onProgress?.(ProcessingStep.ANALYZE, 0);
     let blurScore = 0;
     let exposureAnalysis;
@@ -82,7 +85,8 @@ export const analyzeImage = async (
     let descriptorAnalysis;
     
     try {
-      // Calculate blur score
+      // Calculate blur score (25% of analysis)
+      onProgress?.(ProcessingStep.ANALYZE, 5);
       blurScore = calculateBlurScore(imageData);
       console.log(`Calculated blur score for ${file.name}: ${blurScore}`);
       onProgress?.(ProcessingStep.ANALYZE, 25);
@@ -92,7 +96,8 @@ export const analyzeImage = async (
     }
     
     try {
-      // Analyze exposure
+      // Analyze exposure (25% of analysis)
+      onProgress?.(ProcessingStep.ANALYZE, 30);
       exposureAnalysis = analyzeEnhancedExposure(imageData);
       console.log(`Analyzed exposure for ${file.name}`);
       onProgress?.(ProcessingStep.ANALYZE, 50);
@@ -103,7 +108,8 @@ export const analyzeImage = async (
     }
     
     try {
-      // Analyze noise
+      // Analyze noise (25% of analysis)
+      onProgress?.(ProcessingStep.ANALYZE, 55);
       noiseAnalysis = analyzeNoise(imageData);
       console.log(`Analyzed noise for ${file.name}`);
       onProgress?.(ProcessingStep.ANALYZE, 75);
@@ -114,7 +120,8 @@ export const analyzeImage = async (
     }
     
     try {
-      // Analyze descriptors
+      // Analyze descriptors (25% of analysis)
+      onProgress?.(ProcessingStep.ANALYZE, 80);
       descriptorAnalysis = analyzeDescriptors(imageData);
       console.log(`Analyzed descriptors for ${file.name}`);
       onProgress?.(ProcessingStep.ANALYZE, 100);
@@ -127,6 +134,8 @@ export const analyzeImage = async (
     // Step 5: Calculate derived metrics
     onProgress?.(ProcessingStep.EXPORT, 0);
     const technicalScore = calculateTechnicalScore(metadata);
+    onProgress?.(ProcessingStep.EXPORT, 50);
+    
     const compositeScore = calculateCompositeScore(
       blurScore,
       exposureAnalysis.exposureScore,
@@ -134,8 +143,8 @@ export const analyzeImage = async (
       technicalScore,
       descriptorAnalysis.photogrammetricScore
     );
-    const quality = getQualityLevel(compositeScore.overall);
     
+    const quality = getQualityLevel(compositeScore.overall);
     const processingDuration = performance.now() - startTime;
     
     console.log(`Completed analysis for ${file.name} with composite score: ${compositeScore.overall} in ${processingDuration.toFixed(2)}ms`);
