@@ -67,7 +67,7 @@ const getLaplacianFragmentShader = (useHighPrecision: boolean = false) => `
 `;
 
 /**
- * Fragment shader for Harris corner detection with high precision
+ * FIXED Fragment shader for Harris corner detection with proper scaling
  */
 const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
   precision ${useHighPrecision ? 'highp' : 'mediump'} float;
@@ -79,30 +79,80 @@ const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
   void main() {
     vec2 onePixel = vec2(1.0) / u_textureSize;
     
-    // Calculate gradients with higher precision
-    float Ix = (
-      texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).r -
-      texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).r
-    ) * 0.5;
+    // Convert to grayscale first
+    vec4 centerColor = texture2D(u_image, v_texCoord);
+    float centerGray = dot(centerColor.rgb, vec3(0.299, 0.587, 0.114));
     
-    float Iy = (
-      texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).r -
-      texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).r
-    ) * 0.5;
+    // Calculate gradients with higher precision using grayscale
+    float rightGray = dot(texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+    float leftGray = dot(texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114));
+    float topGray = dot(texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114));
+    float bottomGray = dot(texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114));
     
-    // Harris matrix elements with Gaussian-like weighting
-    float weight = 1.0; // Could be enhanced with actual Gaussian
-    float Ixx = Ix * Ix * weight;
-    float Iyy = Iy * Iy * weight;
-    float Ixy = Ix * Iy * weight;
+    float Ix = (rightGray - leftGray) * 0.5;
+    float Iy = (bottomGray - topGray) * 0.5;
     
-    // Harris response with higher precision
-    float det = Ixx * Iyy - Ixy * Ixy;
-    float trace = Ixx + Iyy;
+    // Harris matrix elements with proper scaling
+    float Ixx = Ix * Ix;
+    float Iyy = Iy * Iy;
+    float Ixy = Ix * Iy;
+    
+    // Apply Gaussian-like weighting in a 3x3 window
+    float totalWeight = 0.0;
+    float weightedIxx = 0.0;
+    float weightedIyy = 0.0;
+    float weightedIxy = 0.0;
+    
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        vec2 sampleCoord = v_texCoord + vec2(float(dx), float(dy)) * onePixel;
+        
+        // Gaussian weight (approximation)
+        float weight = 1.0;
+        if (dx == 0 && dy == 0) weight = 4.0;
+        else if (dx == 0 || dy == 0) weight = 2.0;
+        else weight = 1.0;
+        
+        // Sample gradients at this position
+        vec4 sampleColor = texture2D(u_image, sampleCoord);
+        float sampleGray = dot(sampleColor.rgb, vec3(0.299, 0.587, 0.114));
+        
+        float sampleIx = (dot(texture2D(u_image, sampleCoord + vec2(onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114)) - 
+                         dot(texture2D(u_image, sampleCoord + vec2(-onePixel.x, 0.0)).rgb, vec3(0.299, 0.587, 0.114))) * 0.5;
+        float sampleIy = (dot(texture2D(u_image, sampleCoord + vec2(0.0, onePixel.y)).rgb, vec3(0.299, 0.587, 0.114)) - 
+                         dot(texture2D(u_image, sampleCoord + vec2(0.0, -onePixel.y)).rgb, vec3(0.299, 0.587, 0.114))) * 0.5;
+        
+        weightedIxx += sampleIx * sampleIx * weight;
+        weightedIyy += sampleIy * sampleIy * weight;
+        weightedIxy += sampleIx * sampleIy * weight;
+        totalWeight += weight;
+      }
+    }
+    
+    // Normalize by total weight
+    weightedIxx /= totalWeight;
+    weightedIyy /= totalWeight;
+    weightedIxy /= totalWeight;
+    
+    // Harris response calculation
+    float det = weightedIxx * weightedIyy - weightedIxy * weightedIxy;
+    float trace = weightedIxx + weightedIyy;
     float response = det - u_k * trace * trace;
     
-    // Normalize and enhance visibility
-    response = response * 1000.0; // Scale up for visibility
+    // Enhanced scaling and normalization for better visibility
+    // Apply non-linear scaling to enhance corner responses
+    response = response * 10000.0; // Initial scaling
+    
+    // Apply threshold to reduce noise
+    if (response < 0.001) {
+      response = 0.0;
+    } else {
+      // Non-linear enhancement for positive responses
+      response = sqrt(response);
+      response = response * 0.5; // Final scaling
+    }
+    
+    // Clamp to valid range
     response = clamp(response, 0.0, 1.0);
     
     gl_FragColor = vec4(response, response, response, 1.0);
