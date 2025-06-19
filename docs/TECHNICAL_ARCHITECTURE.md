@@ -1,4 +1,4 @@
-# Technical Architecture Documentation
+# Enhanced Technical Architecture Documentation
 
 ## System Overview
 
@@ -18,15 +18,16 @@ The Drone Image Quality Analyzer is a client-side web application built with Rea
 │  │ • ImageGrid     │    │ • Exposure Eval │    │ • Background│ │
 │  │ • Results       │    │ • Noise Detect  │    │   Tasks     │ │
 │  │ • Export        │    │ • Feature Ext.  │    │             │ │
+│  │ • Debug Viz     │    │ • Artifact Det. │    │             │ │
 │  └─────────────────┘    └─────────────────┘    └─────────────┘ │
 │           │                       │                       │     │
 │           ▼                       ▼                       ▼     │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
-│  │   State Mgmt    │    │  Canvas API     │    │ File System │ │
+│  │   State Mgmt    │    │  Canvas/WebGL   │    │ File System │ │
 │  │                 │    │                 │    │             │ │
 │  │ • React Hooks   │    │ • ImageData     │    │ • File API  │ │
 │  │ • Local State   │    │ • 2D Context    │    │ • Blob API  │ │
-│  │ • Derived State │    │ • Pixel Manip   │    │ • URL API   │ │
+│  │ • Derived State │    │ • WebGL Shaders │    │ • URL API   │ │
 │  └─────────────────┘    └─────────────────┘    └─────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -151,42 +152,109 @@ export const FEATURE_CONFIG = {
 - **Vignetting**: Radial brightness profiling with polynomial fitting
 - **Configurable Scoring**: Weighted penalties and rewards system
 
+## Enhanced Debug Visualization System
+
+### Comprehensive Visualization Types
+
+The debug visualization system now supports 7 different visualization types:
+
+1. **Original Image**: Source image display
+2. **Laplacian Edge Detection**: Blur analysis visualization showing edge response
+3. **Harris Corner Detection**: Feature detection visualization showing corner strength
+4. **Noise Map**: Block-wise luminance variation visualization
+5. **Compression Artifacts**: Block boundary discontinuity detection
+6. **Chromatic Aberration**: Channel misalignment heatmap
+7. **Vignetting Profile**: Radial brightness drop visualization
+
+### WebGL Shader Implementation
+
+Each visualization type uses specialized WebGL fragment shaders for GPU-accelerated processing:
+
+#### Noise Visualization Shader
+```glsl
+// Calculates local variance in 8x8 blocks
+float variance = 0.0;
+for (float y = 0.0; y < blockSize.y; y += 1.0) {
+  for (float x = 0.0; x < blockSize.x; x += 1.0) {
+    vec2 sampleCoord = (blockCoord + vec2(x, y)) / u_textureSize;
+    // Calculate block variance...
+  }
+}
+```
+
+#### Compression Artifact Shader
+```glsl
+// Detects discontinuities at 8x8 block boundaries
+vec2 blockPos = mod(v_texCoord * u_textureSize, blockSize);
+float boundaryDistance = min(min(blockPos.x, blockSize.x - blockPos.x), 
+                            min(blockPos.y, blockSize.y - blockPos.y));
+if (boundaryDistance < 1.0) {
+  // Check for discontinuity at block boundary...
+}
+```
+
+#### Chromatic Aberration Shader
+```glsl
+// Multi-channel Sobel gradient analysis
+vec3 sobelX = vec3(0.0);
+vec3 sobelY = vec3(0.0);
+// Apply Sobel kernels to each color channel...
+vec3 magnitude = sqrt(sobelX * sobelX + sobelY * sobelY);
+float aberration = (rg_diff + gb_diff + rb_diff) / 3.0;
+```
+
+#### Vignetting Visualization Shader
+```glsl
+// Radial brightness analysis
+vec2 center = vec2(0.5, 0.5);
+float distance = length(v_texCoord - center);
+float expectedBrightness = centerBrightness * (1.0 - distance / maxDistance * 0.3);
+float vignetting = abs(brightness - expectedBrightness) / centerBrightness;
+```
+
+### Educational Interface
+
+Each visualization includes comprehensive explanations:
+
+- **Algorithm Details**: How each detection method works
+- **Interpretation Guidelines**: What the visualizations show
+- **Quality Thresholds**: What values indicate good vs poor quality
+- **Practical Applications**: How the metrics affect photogrammetry
+
 ## Enhanced Data Flow Architecture
 
-### Processing Pipeline with Progress Tracking
+### Processing Pipeline with Visualization Support
 
 ```
-File Input → Validation → Orientation → Metadata → Analysis → Scoring → Results
-     ↓           ↓           ↓          ↓          ↓         ↓        ↓
-   File API   Enhanced    EXIF       Enhanced   Multi-    Composite  Display
-              Validation  Correction  Metadata   Algorithm  Score     Export
+File Input → Validation → Orientation → Metadata → Analysis → Scoring → Results → Debug Viz
+     ↓           ↓           ↓          ↓          ↓         ↓        ↓         ↓
+   File API   Enhanced    EXIF       Enhanced   Multi-    Composite  Display   WebGL
+              Validation  Correction  Metadata   Algorithm  Score     Export    Shaders
                                      Extract    Pipeline   Calc      
 ```
 
-### State Management Flow with Performance Tracking
+### WebGL Processing Pipeline
 
 ```
-User Action → Component State → Analysis Pipeline → Result State → UI Update
-     ↓              ↓                   ↓              ↓           ↓
-  File Select   useState Hook     Enhanced Processing Analysis    Re-render
-  Threshold     useCallback       Progress Tracking   Results     Progress
-  Filter        useMemo          Error Handling      Statistics   Export
-  Settings      Performance      WebGL Acceleration  Performance  Metrics
+ImageData → WebGL Context → Shader Compilation → Texture Creation → GPU Processing → Result Readback
+     ↓             ↓              ↓                    ↓               ↓              ↓
+   Canvas      Context Pool   Program Cache      Texture Upload   Fragment Shader  ImageData
+   Creation    Management     Optimization       Memory Mgmt       Execution        Conversion
 ```
 
 ### Enhanced Memory Management
 
 ```
-Image Loading → Orientation → Canvas Creation → Analysis → Cleanup → Next Image
-      ↓             ↓              ↓             ↓         ↓          ↓
-   File Blob    EXIF Check    Corrected Canvas Processing Dispose   GC Trigger
-   Object URL   Metadata      ImageData        WebGL      Canvas    Memory Free
-   Validation   Extraction    Pixel Array      Context    Cleanup   Performance
+Image Loading → Orientation → Canvas Creation → Analysis → WebGL Processing → Cleanup → Next Image
+      ↓             ↓              ↓             ↓         ↓                  ↓          ↓
+   File Blob    EXIF Check    Corrected Canvas Processing Context Pool      Dispose   GC Trigger
+   Object URL   Metadata      ImageData        CPU/GPU     Shader Cache     Canvas    Memory Free
+   Validation   Extraction    Pixel Array      Hybrid      Texture Mgmt     Cleanup   Performance
 ```
 
 ## Component Architecture with Enhanced Features
 
-### Hierarchical Structure with New Components
+### Hierarchical Structure with Debug Components
 
 ```
 App
@@ -221,6 +289,12 @@ App
 │   ├── AlgorithmDetails
 │   ├── RecommendationPanel
 │   └── DebugVisualization (Dev mode)
+├── DebugVisualizationModal (New)
+│   ├── VisualizationControls
+│   ├── ShaderOutputDisplay
+│   ├── PerformanceMetrics
+│   ├── EducationalExplanations
+│   └── DownloadCapability
 ├── ReportExport (Enhanced)
 │   ├── MissionMetadata
 │   ├── CSVExport (Improved formatting)
@@ -228,27 +302,8 @@ App
 └── Services
     ├── QualityReportManager
     ├── PerformanceBenchmark
+    ├── WebGLContextManager
     └── ConfigurationManager
-```
-
-### Enhanced Data Flow Between Components
-
-```
-App (Enhanced Central State)
- ├── analyses: ImageAnalysis[] (with performance data)
- ├── progress: ProcessingProgress (detailed tracking)
- ├── threshold: number
- ├── stats: AnalysisStats (enhanced metrics)
- ├── missionData: MissionMetadata
- └── performanceMetrics: PerformanceBenchmark[]
-      ↓
-Enhanced Component Props Distribution
- ├── FileUpload ← onFilesSelected, validation config
- ├── ProgressBar ← progress, performance metrics
- ├── ImageGrid ← analyses, threshold, lazy loading
- ├── StatsOverview ← stats, performance data
- ├── TechnicalPanel ← analysis, debug capabilities
- └── ReportExport ← analyses, threshold, mission data
 ```
 
 ## Performance Optimizations
@@ -259,7 +314,7 @@ Enhanced Component Props Distribution
 - **Orientation Correction**: EXIF-based automatic image rotation
 - **Progressive Processing**: Chunked processing with progress callbacks
 - **Memory Management**: Immediate cleanup with performance monitoring
-- **WebGL Acceleration**: GPU-accelerated blur and feature detection
+- **WebGL Acceleration**: GPU-accelerated blur, feature, and artifact detection
 
 ### 2. Advanced UI Performance
 
@@ -273,9 +328,18 @@ Enhanced Component Props Distribution
 
 - **Web Workers**: Background processing for CPU-intensive tasks
 - **WebGL Context Pooling**: Efficient GPU resource management
+- **Shader Caching**: Compiled shader program reuse
 - **RequestAnimationFrame**: Smooth progress updates
 - **Blob URL Management**: Efficient file handling with cleanup
 - **Canvas Optimization**: Reusable contexts and memory management
+
+### 4. WebGL Performance Optimizations
+
+- **Context Pooling**: Reuse WebGL contexts across operations
+- **Shader Program Caching**: Avoid recompilation of shaders
+- **Texture Management**: Efficient texture creation and cleanup
+- **Precision Optimization**: Dynamic precision selection based on capabilities
+- **Fallback Handling**: Graceful degradation to CPU when GPU fails
 
 ## Enhanced Error Handling Strategy
 
@@ -295,6 +359,7 @@ try {
 - **Metadata Failure**: Use enhanced defaults with warnings
 - **Analysis Failure**: Detailed error categorization and recovery
 - **WebGL Failure**: Automatic CPU fallback with performance logging
+- **Shader Compilation Failure**: Fallback to simpler shaders or CPU processing
 
 ### 3. Enhanced User Feedback
 
@@ -302,6 +367,7 @@ try {
 - **Error Classification**: Specific error types with solutions
 - **Performance Warnings**: Real-time performance guidance
 - **Validation Feedback**: Comprehensive file validation with suggestions
+- **Debug Information**: Development-mode error details and shader logs
 
 ## Security Considerations
 
@@ -311,6 +377,7 @@ try {
 - **Local File Access**: File API with comprehensive validation
 - **Memory Isolation**: Enhanced cleanup and security boundaries
 - **EXIF Privacy**: Metadata processing with privacy controls
+- **WebGL Security**: Shader validation and context isolation
 
 ### 2. Advanced Input Validation
 
@@ -318,6 +385,7 @@ try {
 - **Size Limits**: Format-specific intelligent limits
 - **Malformed Data**: Robust error handling with security checks
 - **Content Validation**: Enhanced image content verification
+- **Shader Input Validation**: Secure WebGL parameter handling
 
 ## Scalability Considerations
 
@@ -325,8 +393,9 @@ try {
 
 - **Memory Usage**: Optimized for 200+ images per session
 - **Processing Time**: ~2-5 seconds per image with GPU acceleration
-- **Browser Limits**: Enhanced Canvas memory management
+- **Browser Limits**: Enhanced Canvas and WebGL memory management
 - **Batch Processing**: Intelligent chunking and progress management
+- **GPU Memory**: Efficient texture and context management
 
 ### 2. Advanced Future Enhancements
 
@@ -335,6 +404,7 @@ try {
 - **Service Workers**: Offline capability with sync
 - **WebAssembly**: Performance-critical algorithm optimization
 - **Machine Learning**: AI-powered quality assessment
+- **WebGPU**: Next-generation GPU compute capabilities
 
 ## Technology Integration
 
@@ -348,6 +418,7 @@ try {
 
 - **File API**: Enhanced file reading and validation
 - **Canvas API**: Advanced image processing with WebGL integration
+- **WebGL API**: GPU-accelerated image processing and visualization
 - **Blob API**: Optimized data URL generation with cleanup
 - **URL API**: Enhanced object URL management
 - **Intersection Observer**: Efficient lazy loading implementation
@@ -364,14 +435,16 @@ Enhanced Build Process → Optimized Assets → CDN Distribution
    Tree Shake              Asset Hash     Edge Caching
    Minification            Compression    Fast Loading
    Code Splitting          Service Worker Progressive Enhancement
+   Shader Optimization     WebGL Assets   GPU Compatibility
 ```
 
 ### 2. Advanced Browser Compatibility
 
 - **Progressive Enhancement**: Core features work everywhere with enhancements
-- **Feature Detection**: Comprehensive capability detection
+- **Feature Detection**: Comprehensive capability detection including WebGL
 - **Polyfills**: Minimal, targeted support for legacy browsers
-- **Performance Adaptation**: Automatic optimization based on capabilities
+- **Performance Adaptation**: Automatic optimization based on GPU capabilities
+- **Fallback Strategies**: Multiple levels of graceful degradation
 
 ## Configuration Management
 
@@ -398,5 +471,23 @@ export const SYSTEM_CONFIG = {
 - **Performance Adaptation**: Automatic optimization based on hardware
 - **User Preferences**: Persistent settings with local storage
 - **Mission-Specific**: Context-aware configuration management
+- **Debug Settings**: Development-mode configuration options
 
-This enhanced architecture ensures optimal performance, maintainability, and user experience while handling the computational demands of professional image quality analysis in a browser environment with advanced features and comprehensive error handling.
+## Debug and Development Features
+
+### 1. Comprehensive Debug Visualization
+
+- **Real-time Shader Output**: Live visualization of GPU processing results
+- **Educational Interface**: Clear explanations of each analysis type
+- **Performance Metrics**: GPU vs CPU performance comparison
+- **Download Capability**: Export visualizations for documentation
+- **Development Mode**: Enhanced debugging features for developers
+
+### 2. Performance Monitoring
+
+- **WebGL Benchmarking**: Automatic CPU vs GPU performance comparison
+- **Context Pool Monitoring**: WebGL resource usage tracking
+- **Memory Usage Tracking**: Real-time memory consumption monitoring
+- **Processing Speed Metrics**: Detailed timing information for optimization
+
+This enhanced architecture ensures optimal performance, maintainability, and user experience while handling the computational demands of professional image quality analysis in a browser environment with comprehensive debugging capabilities and advanced GPU acceleration.

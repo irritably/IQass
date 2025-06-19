@@ -1,13 +1,13 @@
 /**
- * Debug Visualization Modal Component
+ * Enhanced Debug Visualization Modal Component
  * 
- * This component provides visualization of shader outputs for debugging
- * and educational purposes, helping users understand the image analysis process.
+ * This component provides comprehensive visualization of shader outputs and noise analysis
+ * for debugging and educational purposes, helping users understand the image analysis process.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ImageAnalysis } from '../types';
-import { X, Eye, Zap, Target, Info, Download } from 'lucide-react';
+import { X, Eye, Zap, Target, Info, Download, Grid, Layers, AlertTriangle, Camera } from 'lucide-react';
 import { generateDebugVisualization, getPerformanceStats } from '../utils/webglProcessing';
 
 interface DebugVisualizationModalProps {
@@ -15,7 +15,14 @@ interface DebugVisualizationModalProps {
   onClose: () => void;
 }
 
-type VisualizationType = 'original' | 'laplacian' | 'harris';
+type VisualizationType = 
+  | 'original'
+  | 'laplacian'
+  | 'harris'
+  | 'noise'
+  | 'compression'
+  | 'aberration'
+  | 'vignetting';
 
 export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = ({
   analysis,
@@ -104,6 +111,53 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
 
   const performanceStats = getPerformanceStats();
 
+  const getVisualizationIcon = (type: VisualizationType) => {
+    switch (type) {
+      case 'original': return <Eye className="w-5 h-5" />;
+      case 'laplacian': return <Zap className="w-5 h-5" />;
+      case 'harris': return <Target className="w-5 h-5" />;
+      case 'noise': return <Grid className="w-5 h-5" />;
+      case 'compression': return <Layers className="w-5 h-5" />;
+      case 'aberration': return <AlertTriangle className="w-5 h-5" />;
+      case 'vignetting': return <Camera className="w-5 h-5" />;
+      default: return <Eye className="w-5 h-5" />;
+    }
+  };
+
+  const getVisualizationDescription = (type: VisualizationType) => {
+    switch (type) {
+      case 'original': return 'Source image';
+      case 'laplacian': return 'Edge response map';
+      case 'harris': return 'Corner response map';
+      case 'noise': return 'Block-wise luminance variation';
+      case 'compression': return 'Block boundary discontinuities';
+      case 'aberration': return 'Channel misalignment heatmap';
+      case 'vignetting': return 'Radial brightness drop';
+      default: return 'Visualization';
+    }
+  };
+
+  const getVisualizationExplanation = (type: VisualizationType) => {
+    switch (type) {
+      case 'original':
+        return 'This is the original image as uploaded. Use the buttons on the left to view different analysis visualizations.';
+      case 'laplacian':
+        return 'The Laplacian edge detection highlights areas of rapid intensity change. Brighter areas indicate sharper edges, while darker areas suggest blur or smooth gradients. This visualization helps understand how the blur score is calculated.';
+      case 'harris':
+        return 'The Harris corner detection shows corner response strength. Brighter areas indicate stronger corners that are good for feature matching in photogrammetry. This visualization helps understand feature quality and distribution.';
+      case 'noise':
+        return 'The noise map shows local standard deviation of luminance in small blocks. Brighter areas indicate more noise, which can degrade 3D reconstruction quality. This helps identify sensor noise patterns and problematic image regions.';
+      case 'compression':
+        return 'This overlay highlights compression artifacts detected along typical JPEG block boundaries. Strong transitions across these blocks may reduce image fidelity and affect feature matching accuracy.';
+      case 'aberration':
+        return 'This map reveals chromatic aberration by showing gradient misalignments between color channels. It\'s useful for diagnosing lens issues or sensor alignment problems that can affect geometric accuracy.';
+      case 'vignetting':
+        return 'The vignetting map shows how brightness falls off from center to edges. A radial profile is fitted and shown to reveal both natural lens shading and sensor issues that can affect photogrammetric accuracy.';
+      default:
+        return 'Visualization explanation not available.';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -128,6 +182,7 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
               <h3 className="text-lg font-medium text-gray-900">Visualization Types</h3>
               
               <div className="space-y-2">
+                {/* Original Image */}
                 <button
                   onClick={() => handleVisualizationChange('original')}
                   className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
@@ -136,13 +191,14 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <Eye className="w-5 h-5" />
+                  {getVisualizationIcon('original')}
                   <div className="text-left">
                     <div className="font-medium">Original Image</div>
-                    <div className="text-sm text-gray-500">Source image</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('original')}</div>
                   </div>
                 </button>
 
+                {/* Blur Analysis */}
                 <button
                   onClick={() => handleVisualizationChange('laplacian')}
                   className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
@@ -151,13 +207,14 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <Zap className="w-5 h-5" />
+                  {getVisualizationIcon('laplacian')}
                   <div className="text-left">
                     <div className="font-medium">Laplacian (Blur Detection)</div>
-                    <div className="text-sm text-gray-500">Edge response map</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('laplacian')}</div>
                   </div>
                 </button>
 
+                {/* Feature Detection */}
                 <button
                   onClick={() => handleVisualizationChange('harris')}
                   className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
@@ -166,10 +223,74 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <Target className="w-5 h-5" />
+                  {getVisualizationIcon('harris')}
                   <div className="text-left">
                     <div className="font-medium">Harris Corners</div>
-                    <div className="text-sm text-gray-500">Corner response map</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('harris')}</div>
+                  </div>
+                </button>
+
+                {/* Noise Analysis */}
+                <button
+                  onClick={() => handleVisualizationChange('noise')}
+                  className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
+                    activeVisualization === 'noise'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {getVisualizationIcon('noise')}
+                  <div className="text-left">
+                    <div className="font-medium">Noise Map</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('noise')}</div>
+                  </div>
+                </button>
+
+                {/* Compression Artifacts */}
+                <button
+                  onClick={() => handleVisualizationChange('compression')}
+                  className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
+                    activeVisualization === 'compression'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {getVisualizationIcon('compression')}
+                  <div className="text-left">
+                    <div className="font-medium">Compression Artifacts</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('compression')}</div>
+                  </div>
+                </button>
+
+                {/* Chromatic Aberration */}
+                <button
+                  onClick={() => handleVisualizationChange('aberration')}
+                  className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
+                    activeVisualization === 'aberration'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {getVisualizationIcon('aberration')}
+                  <div className="text-left">
+                    <div className="font-medium">Chromatic Aberration</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('aberration')}</div>
+                  </div>
+                </button>
+
+                {/* Vignetting */}
+                <button
+                  onClick={() => handleVisualizationChange('vignetting')}
+                  className={`w-full flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
+                    activeVisualization === 'vignetting'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {getVisualizationIcon('vignetting')}
+                  <div className="text-left">
+                    <div className="font-medium">Vignetting Profile</div>
+                    <div className="text-sm text-gray-500">{getVisualizationDescription('vignetting')}</div>
                   </div>
                 </button>
               </div>
@@ -203,6 +324,10 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                   {activeVisualization === 'original' && 'Original Image'}
                   {activeVisualization === 'laplacian' && 'Laplacian Edge Detection'}
                   {activeVisualization === 'harris' && 'Harris Corner Detection'}
+                  {activeVisualization === 'noise' && 'Noise Map'}
+                  {activeVisualization === 'compression' && 'Compression Artifacts'}
+                  {activeVisualization === 'aberration' && 'Chromatic Aberration'}
+                  {activeVisualization === 'vignetting' && 'Vignetting Profile'}
                 </h3>
                 
                 <button
@@ -248,15 +373,7 @@ export const DebugVisualizationModal: React.FC<DebugVisualizationModalProps> = (
                 <div className="flex items-start space-x-2">
                   <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-blue-800">
-                    {activeVisualization === 'original' && (
-                      <p>This is the original image as uploaded. Use the buttons on the left to view different analysis visualizations.</p>
-                    )}
-                    {activeVisualization === 'laplacian' && (
-                      <p>The Laplacian edge detection highlights areas of rapid intensity change. Brighter areas indicate sharper edges, while darker areas suggest blur or smooth gradients. This visualization helps understand how the blur score is calculated.</p>
-                    )}
-                    {activeVisualization === 'harris' && (
-                      <p>The Harris corner detection shows corner response strength. Brighter areas indicate stronger corners that are good for feature matching in photogrammetry. This visualization helps understand feature quality and distribution.</p>
-                    )}
+                    <p>{getVisualizationExplanation(activeVisualization)}</p>
                   </div>
                 </div>
               </div>

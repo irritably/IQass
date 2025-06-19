@@ -2,7 +2,7 @@
  * Enhanced WebGL-based Image Processing Utilities
  * 
  * This module provides GPU-accelerated image processing operations using WebGL shaders
- * with context pooling, performance benchmarking, and precision optimization.
+ * with context pooling, performance benchmarking, and comprehensive visualization support.
  */
 
 import { WebGLCapabilities, PerformanceBenchmark } from '../types';
@@ -102,6 +102,174 @@ const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
     float response = det - u_k * trace * trace;
     
     gl_FragColor = vec4(response, response, response, 1.0);
+  }
+`;
+
+/**
+ * Fragment shader for noise visualization
+ */
+const getNoiseFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 blockSize = vec2(8.0);
+    vec2 blockCoord = floor(v_texCoord * u_textureSize / blockSize) * blockSize;
+    
+    // Calculate local variance in 8x8 block
+    float mean = 0.0;
+    float variance = 0.0;
+    float count = 0.0;
+    
+    for (float y = 0.0; y < blockSize.y; y += 1.0) {
+      for (float x = 0.0; x < blockSize.x; x += 1.0) {
+        vec2 sampleCoord = (blockCoord + vec2(x, y)) / u_textureSize;
+        if (sampleCoord.x <= 1.0 && sampleCoord.y <= 1.0) {
+          vec4 color = texture2D(u_image, sampleCoord);
+          float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+          mean += luminance;
+          count += 1.0;
+        }
+      }
+    }
+    mean /= count;
+    
+    for (float y = 0.0; y < blockSize.y; y += 1.0) {
+      for (float x = 0.0; x < blockSize.x; x += 1.0) {
+        vec2 sampleCoord = (blockCoord + vec2(x, y)) / u_textureSize;
+        if (sampleCoord.x <= 1.0 && sampleCoord.y <= 1.0) {
+          vec4 color = texture2D(u_image, sampleCoord);
+          float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+          variance += (luminance - mean) * (luminance - mean);
+        }
+      }
+    }
+    variance /= count;
+    
+    float noise = sqrt(variance);
+    gl_FragColor = vec4(noise, noise, noise, 1.0);
+  }
+`;
+
+/**
+ * Fragment shader for compression artifact detection
+ */
+const getCompressionFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 onePixel = vec2(1.0) / u_textureSize;
+    vec2 blockSize = vec2(8.0);
+    
+    // Check if we're near a block boundary
+    vec2 blockPos = mod(v_texCoord * u_textureSize, blockSize);
+    float boundaryDistance = min(min(blockPos.x, blockSize.x - blockPos.x), 
+                                min(blockPos.y, blockSize.y - blockPos.y));
+    
+    if (boundaryDistance < 1.0) {
+      // We're at a block boundary, check for discontinuity
+      vec4 center = texture2D(u_image, v_texCoord);
+      float centerLum = dot(center.rgb, vec3(0.299, 0.587, 0.114));
+      
+      // Sample neighboring pixels
+      vec4 left = texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0));
+      vec4 right = texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0));
+      vec4 up = texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y));
+      vec4 down = texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y));
+      
+      float leftLum = dot(left.rgb, vec3(0.299, 0.587, 0.114));
+      float rightLum = dot(right.rgb, vec3(0.299, 0.587, 0.114));
+      float upLum = dot(up.rgb, vec3(0.299, 0.587, 0.114));
+      float downLum = dot(down.rgb, vec3(0.299, 0.587, 0.114));
+      
+      // Calculate discontinuity
+      float maxDiff = max(max(abs(centerLum - leftLum), abs(centerLum - rightLum)),
+                         max(abs(centerLum - upLum), abs(centerLum - downLum)));
+      
+      gl_FragColor = vec4(maxDiff, maxDiff, maxDiff, 1.0);
+    } else {
+      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+  }
+`;
+
+/**
+ * Fragment shader for chromatic aberration detection
+ */
+const getChromaticAberrationFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 onePixel = vec2(1.0) / u_textureSize;
+    
+    // Sobel edge detection on each channel
+    vec3 sobelX = vec3(0.0);
+    vec3 sobelY = vec3(0.0);
+    
+    // Sobel X kernel
+    sobelX += texture2D(u_image, v_texCoord + vec2(-onePixel.x, -onePixel.y)).rgb * -1.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb * -2.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(-onePixel.x, onePixel.y)).rgb * -1.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(onePixel.x, -onePixel.y)).rgb * 1.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb * 2.0;
+    sobelX += texture2D(u_image, v_texCoord + vec2(onePixel.x, onePixel.y)).rgb * 1.0;
+    
+    // Sobel Y kernel
+    sobelY += texture2D(u_image, v_texCoord + vec2(-onePixel.x, -onePixel.y)).rgb * -1.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).rgb * -2.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(onePixel.x, -onePixel.y)).rgb * -1.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(-onePixel.x, onePixel.y)).rgb * 1.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).rgb * 2.0;
+    sobelY += texture2D(u_image, v_texCoord + vec2(onePixel.x, onePixel.y)).rgb * 1.0;
+    
+    // Calculate gradient magnitudes for each channel
+    vec3 magnitude = sqrt(sobelX * sobelX + sobelY * sobelY);
+    
+    // Calculate channel differences
+    float rg_diff = abs(magnitude.r - magnitude.g);
+    float gb_diff = abs(magnitude.g - magnitude.b);
+    float rb_diff = abs(magnitude.r - magnitude.b);
+    
+    float aberration = (rg_diff + gb_diff + rb_diff) / 3.0;
+    gl_FragColor = vec4(aberration, aberration, aberration, 1.0);
+  }
+`;
+
+/**
+ * Fragment shader for vignetting visualization
+ */
+const getVignettingFragmentShader = () => `
+  precision mediump float;
+  uniform sampler2D u_image;
+  uniform vec2 u_textureSize;
+  varying vec2 v_texCoord;
+  
+  void main() {
+    vec2 center = vec2(0.5, 0.5);
+    float distance = length(v_texCoord - center);
+    float maxDistance = length(vec2(0.5, 0.5));
+    
+    // Sample brightness at current position
+    vec4 color = texture2D(u_image, v_texCoord);
+    float brightness = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    
+    // Sample center brightness
+    vec4 centerColor = texture2D(u_image, center);
+    float centerBrightness = dot(centerColor.rgb, vec3(0.299, 0.587, 0.114));
+    
+    // Calculate vignetting effect
+    float expectedBrightness = centerBrightness * (1.0 - distance / maxDistance * 0.3);
+    float vignetting = abs(brightness - expectedBrightness) / centerBrightness;
+    
+    gl_FragColor = vec4(vignetting, vignetting, vignetting, 1.0);
   }
 `;
 
@@ -337,7 +505,7 @@ export const benchmarkOperation = async <T>(
   gpuFunction: () => Promise<T> | T,
   imageSize: number
 ): Promise<{ result: T; benchmark: PerformanceBenchmark }> => {
-  //  Benchmark CPU version
+  // Benchmark CPU version
   const cpuStart = performance.now();
   const cpuResult = await cpuFunction();
   const cpuTime = performance.now() - cpuStart;
@@ -626,11 +794,11 @@ export const detectCornersWebGL = (
 };
 
 /**
- * Debug visualization utilities
+ * Enhanced debug visualization utilities with noise/artifact support
  */
 export const generateDebugVisualization = async (
   imageData: ImageData,
-  operation: 'laplacian' | 'sobel' | 'harris'
+  operation: 'laplacian' | 'harris' | 'noise' | 'compression' | 'aberration' | 'vignetting'
 ): Promise<ImageData | null> => {
   const capabilities = getWebGLCapabilities();
   if (!capabilities.webgl) return null;
@@ -652,6 +820,22 @@ export const generateDebugVisualization = async (
       case 'harris':
         fragmentShader = getHarrisFragmentShader(capabilities.supportsHighPrecision);
         programKey = 'harris_debug';
+        break;
+      case 'noise':
+        fragmentShader = getNoiseFragmentShader();
+        programKey = 'noise_debug';
+        break;
+      case 'compression':
+        fragmentShader = getCompressionFragmentShader();
+        programKey = 'compression_debug';
+        break;
+      case 'aberration':
+        fragmentShader = getChromaticAberrationFragmentShader();
+        programKey = 'aberration_debug';
+        break;
+      case 'vignetting':
+        fragmentShader = getVignettingFragmentShader();
+        programKey = 'vignetting_debug';
         break;
       default:
         return null;
