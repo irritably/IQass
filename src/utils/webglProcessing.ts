@@ -101,12 +101,16 @@ const getHarrisFragmentShader = (useHighPrecision: boolean = true) => `
     float trace = Ixx + Iyy;
     float response = det - u_k * trace * trace;
     
+    // Normalize and enhance visibility
+    response = response * 1000.0; // Scale up for visibility
+    response = clamp(response, 0.0, 1.0);
+    
     gl_FragColor = vec4(response, response, response, 1.0);
   }
 `;
 
 /**
- * Fragment shader for noise visualization
+ * Fragment shader for noise visualization - FIXED with constant loop bounds
  */
 const getNoiseFragmentShader = () => `
   precision mediump float;
@@ -115,17 +119,18 @@ const getNoiseFragmentShader = () => `
   varying vec2 v_texCoord;
   
   void main() {
-    vec2 blockSize = vec2(8.0);
-    vec2 blockCoord = floor(v_texCoord * u_textureSize / blockSize) * blockSize;
+    vec2 onePixel = vec2(1.0) / u_textureSize;
+    vec2 blockCoord = floor(v_texCoord * u_textureSize / 8.0) * 8.0;
     
-    // Calculate local variance in 8x8 block
+    // Calculate local variance in 8x8 block using FIXED loop bounds
     float mean = 0.0;
     float variance = 0.0;
     float count = 0.0;
     
-    for (float y = 0.0; y < blockSize.y; y += 1.0) {
-      for (float x = 0.0; x < blockSize.x; x += 1.0) {
-        vec2 sampleCoord = (blockCoord + vec2(x, y)) / u_textureSize;
+    // FIXED: Use constant loop bounds instead of variables
+    for (int y = 0; y < 8; y++) {
+      for (int x = 0; x < 8; x++) {
+        vec2 sampleCoord = (blockCoord + vec2(float(x), float(y))) / u_textureSize;
         if (sampleCoord.x <= 1.0 && sampleCoord.y <= 1.0) {
           vec4 color = texture2D(u_image, sampleCoord);
           float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
@@ -136,9 +141,10 @@ const getNoiseFragmentShader = () => `
     }
     mean /= count;
     
-    for (float y = 0.0; y < blockSize.y; y += 1.0) {
-      for (float x = 0.0; x < blockSize.x; x += 1.0) {
-        vec2 sampleCoord = (blockCoord + vec2(x, y)) / u_textureSize;
+    // Calculate variance with fixed loops
+    for (int y = 0; y < 8; y++) {
+      for (int x = 0; x < 8; x++) {
+        vec2 sampleCoord = (blockCoord + vec2(float(x), float(y))) / u_textureSize;
         if (sampleCoord.x <= 1.0 && sampleCoord.y <= 1.0) {
           vec4 color = texture2D(u_image, sampleCoord);
           float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
@@ -148,7 +154,7 @@ const getNoiseFragmentShader = () => `
     }
     variance /= count;
     
-    float noise = sqrt(variance);
+    float noise = sqrt(variance) * 5.0; // Scale for visibility
     gl_FragColor = vec4(noise, noise, noise, 1.0);
   }
 `;
@@ -164,12 +170,11 @@ const getCompressionFragmentShader = () => `
   
   void main() {
     vec2 onePixel = vec2(1.0) / u_textureSize;
-    vec2 blockSize = vec2(8.0);
     
-    // Check if we're near a block boundary
-    vec2 blockPos = mod(v_texCoord * u_textureSize, blockSize);
-    float boundaryDistance = min(min(blockPos.x, blockSize.x - blockPos.x), 
-                                min(blockPos.y, blockSize.y - blockPos.y));
+    // Check if we're near a block boundary (8x8 JPEG blocks)
+    vec2 blockPos = mod(v_texCoord * u_textureSize, 8.0);
+    float boundaryDistance = min(min(blockPos.x, 8.0 - blockPos.x), 
+                                min(blockPos.y, 8.0 - blockPos.y));
     
     if (boundaryDistance < 1.0) {
       // We're at a block boundary, check for discontinuity
@@ -191,6 +196,8 @@ const getCompressionFragmentShader = () => `
       float maxDiff = max(max(abs(centerLum - leftLum), abs(centerLum - rightLum)),
                          max(abs(centerLum - upLum), abs(centerLum - downLum)));
       
+      // Scale for visibility
+      maxDiff = maxDiff * 3.0;
       gl_FragColor = vec4(maxDiff, maxDiff, maxDiff, 1.0);
     } else {
       gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
@@ -239,6 +246,8 @@ const getChromaticAberrationFragmentShader = () => `
     float rb_diff = abs(magnitude.r - magnitude.b);
     
     float aberration = (rg_diff + gb_diff + rb_diff) / 3.0;
+    aberration = aberration * 2.0; // Scale for visibility
+    
     gl_FragColor = vec4(aberration, aberration, aberration, 1.0);
   }
 `;
@@ -265,9 +274,16 @@ const getVignettingFragmentShader = () => `
     vec4 centerColor = texture2D(u_image, center);
     float centerBrightness = dot(centerColor.rgb, vec3(0.299, 0.587, 0.114));
     
+    // Calculate expected brightness with simple radial model
+    float normalizedDistance = distance / maxDistance;
+    float expectedBrightness = centerBrightness * (1.0 - normalizedDistance * 0.3);
+    
     // Calculate vignetting effect
-    float expectedBrightness = centerBrightness * (1.0 - distance / maxDistance * 0.3);
-    float vignetting = abs(brightness - expectedBrightness) / centerBrightness;
+    float vignetting = 0.0;
+    if (centerBrightness > 0.1) {
+      vignetting = abs(brightness - expectedBrightness) / centerBrightness;
+      vignetting = vignetting * 3.0; // Scale for visibility
+    }
     
     gl_FragColor = vec4(vignetting, vignetting, vignetting, 1.0);
   }
@@ -308,7 +324,8 @@ export const getWebGLCapabilities = (): WebGLCapabilities => {
         'OES_texture_half_float',
         'WEBGL_color_buffer_float',
         'EXT_color_buffer_float',
-        'OES_standard_derivatives'
+        'OES_standard_derivatives',
+        'WEBGL_debug_renderer_info'
       ];
       
       capabilities.extensions = extensionNames.filter(ext => gl.getExtension(ext));
@@ -338,7 +355,7 @@ export const getWebGLCapabilities = (): WebGLCapabilities => {
 };
 
 /**
- * Creates and compiles a shader with error handling
+ * Creates and compiles a shader with enhanced error handling
  */
 const createShader = (
   gl: WebGLRenderingContext | WebGL2RenderingContext,
@@ -709,84 +726,6 @@ export const calculateBlurScoreWebGL = (imageData: ImageData): Promise<number> =
       gl.deleteBuffer(buffer);
 
       resolve(Math.round(normalizedScore));
-    } catch (error) {
-      reject(error);
-    }
-  });
-};
-
-/**
- * Enhanced WebGL-accelerated Harris corner detection
- */
-export const detectCornersWebGL = (
-  imageData: ImageData,
-  k: number = 0.04
-): Promise<Float32Array> => {
-  return new Promise((resolve, reject) => {
-    const capabilities = getWebGLCapabilities();
-    if (!capabilities.webgl) {
-      reject(new Error('WebGL not supported'));
-      return;
-    }
-
-    const context = getWebGLContext(imageData.width, imageData.height);
-    if (!context) {
-      reject(new Error('Failed to get WebGL context'));
-      return;
-    }
-
-    const { gl } = context;
-
-    try {
-      const useHighPrecision = capabilities.supportsHighPrecision;
-      const fragmentShader = getHarrisFragmentShader(useHighPrecision);
-      const program = getProgram(context, 'harris', fragmentShader);
-      
-      if (!program) throw new Error('Failed to create shader program');
-
-      // Set up geometry
-      const buffer = setupGeometry(gl, program);
-      if (!buffer) throw new Error('Failed to setup geometry');
-
-      // Create texture from image data
-      const texture = createTextureFromImageData(gl, imageData);
-      if (!texture) throw new Error('Failed to create texture');
-
-      // Use the program
-      gl.useProgram(program);
-
-      // Set uniforms
-      const imageLocation = gl.getUniformLocation(program, 'u_image');
-      const textureSizeLocation = gl.getUniformLocation(program, 'u_textureSize');
-      const kLocation = gl.getUniformLocation(program, 'u_k');
-
-      gl.uniform1i(imageLocation, 0);
-      gl.uniform2f(textureSizeLocation, imageData.width, imageData.height);
-      gl.uniform1f(kLocation, k);
-
-      // Bind texture
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-
-      // Render
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-      // Read back the result
-      const pixels = new Uint8Array(imageData.width * imageData.height * 4);
-      gl.readPixels(0, 0, imageData.width, imageData.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-      // Convert to Float32Array (Harris response values)
-      const responses = new Float32Array(imageData.width * imageData.height);
-      for (let i = 0; i < responses.length; i++) {
-        // Normalize from 0-255 to appropriate range
-        responses[i] = (pixels[i * 4] / 255.0) * 2.0 - 1.0;
-      }
-
-      // Cleanup (but keep context in pool)
-      gl.deleteTexture(texture);
-      gl.deleteBuffer(buffer);
-
-      resolve(responses);
     } catch (error) {
       reject(error);
     }
