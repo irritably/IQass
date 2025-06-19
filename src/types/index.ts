@@ -1,144 +1,38 @@
 /**
- * Enhanced Type Definitions for Drone Image Quality Analyzer v2.0
+ * Type Definitions for Drone Image Quality Analyzer
  * 
- * This module contains improved TypeScript interfaces with better organization,
- * clear units, configurable thresholds, and separation of UI from data concerns.
+ * This module contains all TypeScript interfaces and types used throughout
+ * the application for image analysis, quality assessment, and UI components.
  */
 
-// ============================================================================
-// CORE DATA TYPES
-// ============================================================================
-
-export interface FileInput {
+export interface ImageAnalysis {
+  id: string;
   file: File;
-  metadata: {
-    name: string;
-    size: number;                // Bytes
-    type: string;                // MIME type
-    lastModified: number;        // Unix timestamp
-  };
-  validation: {
-    isValid: boolean;
-    error: string | null;
-    constraints: {
-      supportedTypes: string[];  // ['image/jpeg', 'image/png', 'image/tiff']
-      maxSize: number;           // 52,428,800 bytes (50MB)
-      minDimensions: { width: number; height: number }; // 100x100 px
-    };
-  };
-}
-
-export interface ProcessedImageData {
-  dimensions: {
-    original: { width: number; height: number };        // Original image size
-    processed: { width: number; height: number };       // Limited to 800px max
-    aspectRatio: number;                                 // width/height ratio
-  };
-  thumbnail: {
-    dataUrl: string;             // Base64 JPEG, 80% quality
-    dimensions: { width: number; height: number };      // Max 150px
-    fileSize: number;            // Thumbnail size in bytes
-  };
-  colorSpace: {
-    detected: 'BT.601' | 'BT.709' | 'BT.2020' | 'unknown';
-    recommended: 'BT.601' | 'BT.709' | 'BT.2020';
-    conversionApplied: boolean;
-  };
-  processing: {
-    resizeRatio: number;         // Scale factor applied (0-1)
-    memoryUsage: number;         // Estimated memory usage in bytes
-    processingTime: number;      // Time taken in milliseconds
-  };
-}
-
-// ============================================================================
-// ANALYSIS RESULTS
-// ============================================================================
-
-export interface BlurAnalysis {
-  score: number;                 // 0-100 scale, higher = sharper
-  metrics: {
-    laplacianVariance: number;   // Raw variance value (0+)
-    normalizedVariance: number;  // Log-normalized value (0+)
-    sceneAdaptation: {
-      sceneType: 'aerial_sky' | 'ground_detail' | 'mixed';
-      normalizationFactor: number; // 12-18 range
-      adaptiveScore: number;     // Scene-adjusted score (0-100)
-    };
-  };
-  algorithm: {
-    method: 'laplacian_single' | 'laplacian_multi_kernel';
-    kernelsUsed: string[];       // ['standard', 'cross', 'sobel']
-    processingMode: 'cpu' | 'webgl';
-  };
-  quality: {
-    classification: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-    confidence: number;          // 0-100, algorithm confidence
-    recommendation: string;      // Human-readable recommendation
-  };
+  name: string;
+  size: number;
+  blurScore: number;
+  quality: 'excellent' | 'good' | 'poor' | 'unsuitable';
+  thumbnail: string;
+  processed: boolean;
+  error?: string;
+  // Enhanced technical quality metrics
+  exposureAnalysis?: ExposureAnalysis;
+  noiseAnalysis?: NoiseAnalysis;
+  metadata?: CameraMetadata;
+  compositeScore?: CompositeQualityScore;
+  // Descriptor-based analysis for photogrammetric quality
+  descriptorAnalysis?: DescriptorAnalysis;
 }
 
 export interface ExposureAnalysis {
-  score: number;                 // 0-100 composite exposure quality
-  histogram: {
-    overexposure: {
-      percentage: number;        // 0-100%, pixels > threshold
-      threshold: number;         // 245-250 (adaptive)
-      affectedAreas: 'sky' | 'highlights' | 'mixed' | null;
-    };
-    underexposure: {
-      percentage: number;        // 0-100%, pixels < threshold  
-      threshold: number;         // 5-15 (adaptive)
-      affectedAreas: 'shadows' | 'foreground' | 'mixed' | null;
-    };
-    distribution: {
-      shadows: number;           // 0-100%, pixels in 0-85 range
-      midtones: number;          // 0-100%, pixels in 85-170 range
-      highlights: number;        // 0-100%, pixels in 170-255 range
-      balance: 'balanced' | 'underexposed' | 'overexposed' | 'high-contrast';
-    };
-  };
-  dynamicRange: {
-    value: number;               // 0-255, P95 - P5 percentile range
-    percentiles: {
-      p5: number;                // 5th percentile brightness (0-255)
-      p95: number;               // 95th percentile brightness (0-255)
-    };
-    quality: 'excellent' | 'good' | 'limited' | 'poor';
-  };
-  spatial: {
-    localContrast: number;       // 0-100, 9x9 window variance analysis
-    highlightRecovery: number;   // 0-100%, recoverable highlight detail
-    shadowDetail: number;       // 0-100%, shadow detail retention
-    exposureVariance: number;    // 0+, regional exposure consistency
-  };
-  colorBalance: {
-    luminance: number;           // 0-1, average Y channel value
-    chrominance: {
-      red: number;               // 0-1, average Cr channel value
-      blue: number;              // 0-1, average Cb channel value
-    };
-    whitePoint: {
-      estimated: number;         // 0-255, estimated white point
-      deviation: number;         // 0-100, deviation from standard
-    };
-  };
-  perceptual: {
-    score: number;               // 0-100, human vision-weighted assessment
-    factors: {
-      midtoneDistribution: number; // 0-100, proper midtone percentage
-      contrastQuality: number;   // 0-100, optimal contrast assessment
-      clippingPenalty: number;   // 0-100, penalty for extreme clipping
-    };
-  };
-  
-  // Legacy fields for backward compatibility
   overexposurePercentage: number;
   underexposurePercentage: number;
   dynamicRange: number;
   averageBrightness: number;
   contrastRatio: number;
   histogramBalance: 'balanced' | 'underexposed' | 'overexposed' | 'high-contrast';
+  exposureScore: number; // 0-100
+  // Enhanced exposure metrics
   localContrast: number;
   highlightRecovery: number;
   shadowDetail: number;
@@ -149,129 +43,57 @@ export interface ExposureAnalysis {
   };
   perceptualExposureScore: number;
   spatialExposureVariance: number;
-  exposureScore: number;
 }
 
-export interface FeatureAnalysis {
-  detection: {
-    keypoints: {
-      total: number;             // Total detected features (0+)
-      density: number;           // Features per 1000 pixels (0+)
-      byType: {
-        corners: number;         // Harris + FAST detection (0+)
-        edges: number;           // Sobel edge detection (0+)
-        blobs: number;           // LoG approximation (0+)
-        textured: number;        // High-frequency content (0+)
-      };
-    };
-    distribution: {
-      spatial: {
-        uniformity: number;      // 0-100%, inverse coefficient of variation
-        coverage: number;        // 0-100%, percentage of non-empty grid cells
-        clustering: number;      // 0-100, nearest neighbor distance analysis
-      };
-      quality: {
-        average: number;         // 0+, mean feature strength
-        median: number;          // 0+, median feature strength
-        standardDeviation: number; // 0+, strength consistency
-        strengthDistribution: number[]; // Histogram of strength values
-      };
-    };
-  };
-  descriptor: {
-    quality: {
-      distinctiveness: number;   // 0-100, feature uniqueness via local contrast
-      repeatability: number;     // 0-100, detection consistency
-      matchability: number;      // 0-100, predicted matching success rate
-    };
-    invariance: {
-      scale: number;             // 0-100%, scale robustness
-      rotation: number;          // 0-100%, rotation robustness
-      illumination: number;      // 0-100%, lighting robustness
-    };
-    photogrammetric: {
-      score: number;             // 0-100, overall 3D reconstruction suitability
-      suitability: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-      factors: {
-        densityScore: number;    // 0-100, optimal feature density
-        distributionScore: number; // 0-100, spatial distribution quality
-        strengthScore: number;   // 0-100, feature strength quality
-        matchingPotential: number; // 0-100, predicted matching success
-      };
-    };
+export interface DescriptorAnalysis {
+  // Feature detection metrics
+  keypointCount: number;
+  keypointDensity: number; // keypoints per 1000 pixels
+  keypointDistribution: {
+    uniformity: number; // 0-100, higher is more uniform
+    coverage: number;   // 0-100, percentage of image covered
+    clustering: number; // 0-100, lower is better (less clustered)
   };
   
-  // Legacy fields for backward compatibility
-  keypointCount: number;
-  keypointDensity: number;
-  keypointDistribution: {
-    uniformity: number;
-    coverage: number;
-    clustering: number;
-  };
+  // Feature quality metrics
   featureStrength: {
     average: number;
     median: number;
     standardDeviation: number;
   };
+  
+  // Descriptor robustness
   descriptorQuality: {
-    distinctiveness: number;
-    repeatability: number;
-    matchability: number;
+    distinctiveness: number; // 0-100
+    repeatability: number;   // 0-100
+    matchability: number;    // 0-100, predicted matching success
   };
-  photogrammetricScore: number;
+  
+  // Photogrammetric suitability
+  photogrammetricScore: number; // 0-100, overall descriptor-based quality
   reconstructionSuitability: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
+  
+  // Feature type analysis
   featureTypes: {
     corners: number;
     edges: number;
     blobs: number;
     textured: number;
   };
-  scaleInvariance: number;
-  rotationInvariance: number;
+  
+  // Scale and rotation invariance
+  scaleInvariance: number; // 0-100
+  rotationInvariance: number; // 0-100
 }
 
 export interface NoiseAnalysis {
-  score: number;                 // 0-100, overall noise quality (higher = less noise)
-  measurements: {
-    level: number;               // 0-100, noise magnitude via local std dev
-    snr: number;                 // 0+, signal-to-noise ratio (higher = better)
-    distribution: {
-      uniform: number;           // 0-100, spatial noise uniformity
-      frequency: 'low' | 'medium' | 'high' | 'mixed'; // Dominant noise frequency
-    };
-  };
-  artifacts: {
-    compression: {
-      score: number;             // 0-100, JPEG blocking artifacts
-      blockingVisible: boolean;  // Visible 8x8 block boundaries
-      severity: 'none' | 'mild' | 'moderate' | 'severe';
-    };
-    chromatic: {
-      score: number;             // 0-100, color fringing at edges
-      fringeWidth: number;       // 0+, average fringe width in pixels
-      affectedEdges: number;     // 0-100%, percentage of edges affected
-    };
-    optical: {
-      vignetting: number;        // 0-100%, corner darkening
-      distortion: number;        // 0-100, barrel/pincushion distortion
-      aberration: number;        // 0-100, overall optical aberration
-    };
-  };
-  assessment: {
-    overallArtifactScore: number; // 0-100, combined artifact penalty
-    reconstructionImpact: 'minimal' | 'low' | 'moderate' | 'high' | 'severe';
-    recommendations: string[];   // Specific improvement suggestions
-  };
-  
-  // Legacy fields for backward compatibility
-  noiseLevel: number;
+  noiseLevel: number; // 0-100 scale
   snrRatio: number;
   compressionArtifacts: number;
   chromaticAberration: number;
   vignetting: number;
   overallArtifactScore: number;
-  noiseScore: number;
+  noiseScore: number; // 0-100
 }
 
 export interface CameraMetadata {
@@ -303,164 +125,43 @@ export interface CameraMetadata {
   };
 }
 
-export interface CompositeScoreBreakdown {
-  overall: number;               // 0-100 final score
-  components: {
-    blur: {
-      rawScore: number;          // 0-100 original score
-      weight: number;            // 0-1 weight applied
-      contribution: number;      // Weighted points added
-    };
-    exposure: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-    noise: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-    technical: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-    descriptor: {
-      rawScore: number;
-      weight: number;
-      contribution: number;
-    };
-  };
-  calculation: {
-    method: 'weighted_average' | 'photogrammetric_specialized';
-    weightsUsed: Record<string, number>;
-    normalization: string;       // Description of normalization applied
-  };
-  recommendation: {
-    classification: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
-    confidence: number;          // 0-100% confidence in classification
-    reasoning: string[];         // Factors influencing classification
-  };
-  
-  // Legacy fields for backward compatibility
-  blur: number;
-  exposure: number;
-  noise: number;
-  technical: number;
-  descriptor: number;
+export interface CompositeQualityScore {
+  blur: number;          // 30% weight
+  exposure: number;      // 25% weight
+  noise: number;         // 20% weight
+  technical: number;     // 10% weight
+  descriptor: number;    // 15% weight
+  overall: number;       // Weighted average
   recommendation: 'excellent' | 'good' | 'acceptable' | 'poor' | 'unsuitable';
 }
 
-export interface CompositeQualityScore extends CompositeScoreBreakdown {}
-
-// ============================================================================
-// CONFIGURATION & THRESHOLDS
-// ============================================================================
-
-export interface QualityThresholds {
-  blur: {
-    excellent: number;           // 85+ (default)
-    good: number;                // 70-84 (default)
-    acceptable: number;          // 55-69 (default)
-    poor: number;                // 40-54 (default)
-    unsuitable: number;          // <40 (default)
+export interface AnalysisStats {
+  totalImages: number;
+  excellentCount: number;
+  goodCount: number;
+  poorCount: number;
+  unsuitableCount: number;
+  averageBlurScore: number;
+  recommendedForReconstruction: number;
+  // Enhanced stats
+  averageExposureScore: number;
+  averageNoiseScore: number;
+  averageCompositeScore: number;
+  averageDescriptorScore: number;
+  averageKeypointCount: number;
+  cameraStats: {
+    [key: string]: number;
   };
-  exposure: {
-    overexposureLimit: number;   // 5% (default, adaptive 3-10%)
-    underexposureLimit: number;  // 5% (default, adaptive 3-15%)
-    dynamicRangeMin: number;     // 120 (default, adaptive 60-150)
-  };
-  noise: {
-    acceptableLevel: number;     // 20 (default, 0-100 scale)
-    snrMinimum: number;          // 10 (default, ratio)
-    artifactTolerance: number;   // 15 (default, 0-100 scale)
-  };
-  features: {
-    minimumCount: number;        // 100 (default)
-    densityMinimum: number;      // 0.5 per 1000px (default)
-    distributionMinimum: number; // 50% uniformity (default)
-  };
-  composite: {
-    weights: {
-      blur: number;              // 0.30 (default)
-      exposure: number;          // 0.25 (default)
-      noise: number;             // 0.20 (default)
-      technical: number;         // 0.10 (default)
-      descriptor: number;        // 0.15 (default)
-    };
-    photogrammetricWeights: {
-      descriptor: number;        // 0.40 (specialized for 3D)
-      blur: number;              // 0.30
-      exposure: number;          // 0.20
-      noise: number;             // 0.10
-    };
+  qualityDistribution: {
+    excellent: number;
+    good: number;
+    acceptable: number;
+    poor: number;
+    unsuitable: number;
   };
 }
-
-export interface SceneConfiguration {
-  sceneType: 'aerial_sky' | 'ground_detail' | 'mixed' | 'auto';
-  adaptiveThresholds: {
-    blur: {
-      normalizationFactor: number; // 12-18 based on scene
-      sceneExpectation: 'high' | 'medium' | 'low';
-    };
-    exposure: {
-      overexposureThreshold: number; // 240-250 adaptive
-      underexposureThreshold: number; // 5-15 adaptive
-      skyTolerance: number;      // 0-50% for aerial images
-    };
-    features: {
-      densityExpectation: number; // Lower for sky, higher for ground
-      uniformityRequirement: number; // Relaxed for aerial
-    };
-  };
-  metadata: {
-    altitude: number | null;     // GPS altitude in meters
-    cameraType: 'drone' | 'handheld' | 'unknown';
-    detectionConfidence: number; // 0-100% scene detection confidence
-  };
-}
-
-// ============================================================================
-// PROCESSING STATE
-// ============================================================================
 
 export interface ProcessingProgress {
-  batch: {
-    current: number;             // Images processed (0+)
-    total: number;               // Total images in batch (1+)
-    percentage: number;          // 0-100% completion
-  };
-  status: {
-    isProcessing: boolean;
-    isPaused: boolean;
-    hasErrors: boolean;
-    canResume: boolean;
-  };
-  timing: {
-    startTime: number;           // Unix timestamp
-    estimatedCompletion: number | null; // Unix timestamp or null
-    averageTimePerImage: number; // Milliseconds per image
-    remainingTime: number | null; // Milliseconds remaining
-  };
-  currentImage: {
-    filename: string | null;
-    step: {
-      current: number;           // 1-5 processing steps
-      total: number;             // Always 5
-      name: string;              // 'Loading', 'Blur Analysis', etc.
-      progress: number;          // 0-100% within current step
-    };
-  } | null;
-  performance: {
-    processingSpeed: number;     // Images per second
-    memoryUsage: number;         // Estimated MB used
-    cpuUtilization: number;      // 0-100% estimated
-    gpuAcceleration: boolean;    // Whether GPU is being used
-  };
-  
-  // Legacy fields for backward compatibility
   current: number;
   total: number;
   isProcessing: boolean;
@@ -469,262 +170,4 @@ export interface ProcessingProgress {
   currentStep?: number;
   currentStepName?: string;
   currentImageProgress?: number;
-}
-
-export interface AnalysisStatistics {
-  summary: {
-    totalImages: number;
-    processedSuccessfully: number;
-    failedAnalysis: number;
-    averageProcessingTime: number; // Milliseconds per image
-  };
-  qualityDistribution: {
-    excellent: number;           // Count of excellent images
-    good: number;                // Count of good images  
-    acceptable: number;          // Count of acceptable images
-    poor: number;                // Count of poor images
-    unsuitable: number;          // Count of unsuitable images
-  };
-  averageScores: {
-    composite: number;           // 0-100 average
-    blur: number;                // 0-100 average
-    exposure: number;            // 0-100 average
-    noise: number;               // 0-100 average
-    descriptor: number;          // 0-100 average
-    technical: number;           // 0-100 average
-  };
-  recommendations: {
-    forReconstruction: number;   // Count above threshold
-    needsReview: number;         // Count in marginal range
-    shouldRetake: number;        // Count below minimum quality
-  };
-  metadata: {
-    cameraStats: Record<string, number>; // Camera model frequency
-    averageFileSize: number;     // Bytes
-    resolutionDistribution: Record<string, number>; // Resolution frequency
-    processingModes: {
-      cpuOnly: number;           // Count processed with CPU
-      gpuAccelerated: number;    // Count processed with GPU
-    };
-  };
-  
-  // Legacy fields for backward compatibility
-  totalImages: number;
-  excellentCount: number;
-  goodCount: number;
-  acceptableCount: number;
-  poorCount: number;
-  unsuitableCount: number;
-  averageBlurScore: number;
-  averageCompositeScore: number;
-  averageDescriptorScore: number;
-  averageKeypointCount: number;
-  recommendedForReconstruction: number;
-  averageExposureScore: number;
-  averageNoiseScore: number;
-  cameraStats: Record<string, number>;
-}
-
-export interface AnalysisStats extends AnalysisStatistics {}
-
-// ============================================================================
-// UI STATE (SEPARATED)
-// ============================================================================
-
-export interface UIState {
-  display: {
-    threshold: number;           // 0-100 quality threshold
-    filter: 'all' | 'recommended' | 'not-recommended' | 'needs-review';
-    sortBy: 'name' | 'score' | 'quality' | 'composite' | 'date';
-    sortDirection: 'asc' | 'desc';
-    gridSize: 'small' | 'medium' | 'large';
-    showTechnicalDetails: boolean;
-  };
-  selection: {
-    selectedImages: string[];    // Array of image IDs
-    activeImage: string | null;  // Currently viewed image ID
-    comparisonMode: boolean;     // Side-by-side comparison
-  };
-  panels: {
-    technicalPanelExpanded: boolean;
-    histogramVisible: boolean;
-    exportPanelOpen: boolean;
-    settingsVisible: boolean;
-  };
-  preferences: {
-    autoAdvanceThreshold: boolean; // Auto-update threshold
-    showDebugInfo: boolean;      // Development mode features
-    preferredUnits: 'metric' | 'imperial';
-    colorScheme: 'light' | 'dark' | 'auto';
-  };
-}
-
-export interface ViewState {
-  layout: {
-    sidebarCollapsed: boolean;
-    fullscreenMode: boolean;
-    splitView: boolean;
-  };
-  navigation: {
-    currentView: 'upload' | 'processing' | 'results' | 'export';
-    previousView: string | null;
-    canGoBack: boolean;
-  };
-  modals: {
-    technicalDetails: {
-      isOpen: boolean;
-      imageId: string | null;
-      activeTab: string;
-    };
-    settings: {
-      isOpen: boolean;
-      activeSection: string;
-    };
-    export: {
-      isOpen: boolean;
-      selectedFormat: string;
-      includeMetadata: boolean;
-    };
-  };
-}
-
-// ============================================================================
-// MAIN IMAGE ANALYSIS INTERFACE
-// ============================================================================
-
-export interface ImageAnalysis {
-  id: string;
-  file: File;
-  name: string;
-  size: number;
-  blurScore: number;
-  quality: 'excellent' | 'good' | 'poor' | 'unsuitable';
-  thumbnail: string;
-  processed: boolean;
-  error?: string;
-  
-  // Enhanced analysis results
-  blurAnalysis?: BlurAnalysis;
-  exposureAnalysis?: ExposureAnalysis;
-  featureAnalysis?: FeatureAnalysis;
-  noiseAnalysis?: NoiseAnalysis;
-  metadata?: CameraMetadata;
-  compositeScore?: CompositeQualityScore;
-  
-  // Legacy compatibility
-  descriptorAnalysis?: FeatureAnalysis;
-  
-  // Processing information
-  processingInfo?: {
-    mode: 'cpu' | 'gpu' | 'hybrid';
-    duration: number;           // Milliseconds
-    memoryUsed: number;         // Bytes
-    sceneDetected: string;      // Scene type detected
-  };
-}
-
-// ============================================================================
-// PERFORMANCE METRICS
-// ============================================================================
-
-export interface WebGLPerformanceMetrics {
-  capabilities: {
-    webglVersion: '1.0' | '2.0' | 'none';
-    maxTextureSize: number;      // Maximum texture dimensions
-    supportsHighPrecision: boolean;
-    supportsFloatTextures: boolean;
-    extensions: string[];        // Available WebGL extensions
-  };
-  benchmarks: {
-    operation: string;           // 'blur_detection', 'harris_corners', etc.
-    imageSize: number;           // Pixel count
-    cpuTime: number;             // Milliseconds
-    gpuTime: number;             // Milliseconds
-    speedup: number;             // cpuTime / gpuTime
-    memoryUsage: number;         // Estimated bytes
-    timestamp: number;           // Unix timestamp
-  }[];
-  statistics: {
-    averageSpeedup: number;      // Overall GPU vs CPU performance
-    totalBenchmarks: number;
-    recommendedMode: 'cpu' | 'gpu' | 'hybrid';
-    performanceTrend: 'improving' | 'stable' | 'degrading';
-  };
-}
-
-export interface MemoryMetrics {
-  usage: {
-    current: number;             // Current memory usage in MB
-    peak: number;                // Peak memory usage in MB
-    available: number;           // Estimated available memory in MB
-  };
-  allocation: {
-    imageData: number;           // Memory for image processing in MB
-    thumbnails: number;          // Memory for thumbnails in MB
-    webglContexts: number;       // Memory for WebGL contexts in MB
-    analysisResults: number;     // Memory for analysis data in MB
-  };
-  optimization: {
-    lazyLoadingActive: boolean;
-    virtualizationThreshold: number; // Image count threshold
-    contextPoolSize: number;     // Number of pooled WebGL contexts
-    garbageCollectionTriggers: number; // Manual GC trigger count
-  };
-}
-
-// ============================================================================
-// EXPORT FORMATS
-// ============================================================================
-
-export interface CSVExportRow {
-  // Basic Information
-  filename: string;
-  fileSize: string;              // "2.1 MB" format
-  dimensions: string;            // "4000x3000" format
-  processingTime: string;        // "1.2s" format
-  
-  // Composite Scoring
-  compositeScore: number;        // 0-100
-  compositeClassification: string; // excellent/good/etc.
-  recommendedForReconstruction: string; // "Yes"/"No"
-  
-  // Individual Scores (with units)
-  blurScore: number;             // 0-100
-  exposureScore: number;         // 0-100  
-  noiseScore: number;            // 0-100
-  technicalScore: number;        // 0-100
-  descriptorScore: number;       // 0-100
-  
-  // Detailed Metrics
-  keypointCount: number;
-  keypointDensity: string;       // "1.2/1000px" format
-  featureDistribution: number;   // 0-100% uniformity
-  overexposurePercentage: string; // "5.2%" format
-  underexposurePercentage: string; // "2.1%" format
-  dynamicRange: number;          // 0-255
-  noiseLevel: string;            // "Low"/"Medium"/"High"
-  
-  // Camera Information
-  cameraMake: string;
-  cameraModel: string;
-  lensModel: string;
-  iso: number | null;
-  aperture: string;              // "f/2.8" format
-  shutterSpeed: string;          // "1/1000s" format
-  focalLength: string;           // "24mm" format
-  
-  // Location Data
-  latitude: number | null;
-  longitude: number | null;
-  altitude: string;              // "120m" format
-  
-  // Processing Information
-  processingMode: string;        // "CPU"/"GPU"
-  sceneType: string;             // "aerial_sky"/"ground_detail"/"mixed"
-  colorSpace: string;            // "BT.709"/"BT.601"
-  
-  // Status
-  analysisStatus: string;        // "Success"/"Error"/"Warning"
-  errorDetails: string;          // Error message if failed
-  warnings: string;              // Comma-separated warnings
 }
