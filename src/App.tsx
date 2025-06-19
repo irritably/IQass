@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { Header } from './components/Header';
-import { FileUpload } from './components/FileUpload';
-import { ProgressBar } from './components/ProgressBar';
+import { DashboardLayout } from './components/Layout/DashboardLayout';
+import { ModernFileUpload } from './components/Dashboard/ModernFileUpload';
+import { ModernProgressBar } from './components/Dashboard/ModernProgressBar';
 import { QualitySettings } from './components/QualitySettings';
-import { StatsOverview } from './components/StatsOverview';
+import { ModernStatsOverview } from './components/Dashboard/ModernStatsOverview';
 import { ImageGrid } from './components/ImageGrid';
 import { QualityHistogram } from './components/QualityHistogram';
 import { ReportExport } from './components/ReportExport';
@@ -18,15 +18,11 @@ function App() {
     total: 0,
     isProcessing: false
   });
-  const [threshold, setThreshold] = useState(70); // Default threshold for composite scoring
+  const [threshold, setThreshold] = useState(70);
 
-  /**
-   * Calculates comprehensive statistics for all analyzed images
-   */
   const calculateStats = useCallback((analyses: ImageAnalysis[]): AnalysisStats => {
     const baseStats = calculateQualityStatistics(analyses, threshold);
     
-    // Calculate additional metrics for the stats overview
     const averageExposureScore = analyses.length > 0
       ? analyses.reduce((sum, a) => sum + (a.exposureAnalysis?.exposureScore || 0), 0) / analyses.length
       : 0;
@@ -39,7 +35,7 @@ function App() {
       ...baseStats,
       averageExposureScore,
       averageNoiseScore,
-      cameraStats: {}, // TODO: Implement camera statistics aggregation
+      cameraStats: {},
       qualityDistribution: {
         excellent: baseStats.excellentCount,
         good: baseStats.goodCount,
@@ -50,9 +46,6 @@ function App() {
     };
   }, [threshold]);
 
-  /**
-   * Handles file selection and processes images sequentially with enhanced progress tracking
-   */
   const handleFilesSelected = useCallback(async (files: File[]) => {
     const startTime = Date.now();
     
@@ -69,7 +62,6 @@ function App() {
       const file = files[i];
       const imageStartTime = Date.now();
       
-      // Update progress with current image info
       setProgress(prev => ({
         ...prev,
         current: i,
@@ -90,7 +82,6 @@ function App() {
         
         newAnalyses.push(analysis);
       } catch (error) {
-        // Create error analysis if processing fails
         newAnalyses.push({
           id: Math.random().toString(36).substr(2, 9),
           file,
@@ -105,18 +96,15 @@ function App() {
         });
       }
 
-      // Update progress and analyses incrementally for better UX
       setProgress(prev => ({
         ...prev,
         current: i + 1,
         imageDuration: Date.now() - imageStartTime
       }));
 
-      // Update analyses incrementally
       setAnalyses(prev => [...prev, ...newAnalyses.slice(i, i + 1)]);
     }
 
-    // Mark processing as complete
     setProgress(prev => ({
       ...prev,
       isProcessing: false,
@@ -130,46 +118,56 @@ function App() {
   const stats = calculateStats(analyses);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Upload Section */}
-          <FileUpload 
+    <DashboardLayout>
+      <div className="space-y-8">
+        {/* Upload Section */}
+        <div className="animate-fade-in-up">
+          <ModernFileUpload 
             onFilesSelected={handleFilesSelected}
             isProcessing={progress.isProcessing}
           />
+        </div>
 
-          {/* Progress Bar */}
-          <ProgressBar progress={progress} />
+        {/* Progress Bar */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <ModernProgressBar progress={progress} />
+        </div>
 
-          {/* Settings */}
-          {analyses.length > 0 && (
+        {/* Settings */}
+        {analyses.length > 0 && (
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <QualitySettings 
               threshold={threshold}
               onThresholdChange={setThreshold}
             />
-          )}
+          </div>
+        )}
 
-          {/* Stats Overview */}
-          {analyses.length > 0 && (
-            <StatsOverview stats={stats} threshold={threshold} />
-          )}
+        {/* Stats Overview */}
+        {analyses.length > 0 && (
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+            <ModernStatsOverview stats={stats} threshold={threshold} />
+          </div>
+        )}
 
-          {/* Quality Histogram */}
-          {analyses.length > 0 && (
+        {/* Quality Histogram */}
+        {analyses.length > 0 && (
+          <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
             <QualityHistogram analyses={analyses} />
-          )}
+          </div>
+        )}
 
-          {/* Image Grid */}
+        {/* Image Grid */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
           <ImageGrid analyses={analyses} threshold={threshold} />
+        </div>
 
-          {/* Export Section */}
+        {/* Export Section */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
           <ReportExport analyses={analyses} threshold={threshold} />
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
 
